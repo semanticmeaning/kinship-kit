@@ -411,8 +411,10 @@ def cmd_site_build(args) -> int:
 
 def cmd_site_serve(args) -> int:
     case = _case(args)
-    if args.host not in ("127.0.0.1", "localhost", "::1") and not args.i_know_its_public:
-        raise KinError("serve слушает только localhost. Для внешнего адреса — --i-know-its-public и profile public.")
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        if not args.i_know_its_public or args.profile != "public":
+            raise KinError("Внешний адрес — только для --profile public и с флагом --i-know-its-public. "
+                           "Приватную сборку смотрите на localhost или выкладывайте за паролем (docs, этап 2).")
     if args.rebuild or not (case.root / "site" / args.profile / "index.html").is_file():
         _require_clean_audit(case, args)
         site.build(case, args.profile)

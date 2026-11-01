@@ -277,6 +277,55 @@ class TestPublication(Base):
         self.assertNotEqual(self.kin("site", "build", ok=False).returncode, 0)
 
 
+class TestPrivacyEdgeCases(Base):
+    def test_open_ended_birth_is_hidden(self):
+        p = self.person("Ветлугин Олег", "unknown", "candidate", "--birth", "1900/..")
+        q = self.person("Ветлугин Павел", "unknown", "candidate", "--birth", "1890/1910")
+        _, hidden = publish.build(Case(self.case), "public")
+        self.assertIn(p, hidden)
+        self.assertNotIn(q, hidden)
+
+    def test_duplicate_of_hidden_person_is_leak_checked(self):
+        main = self.person("Корнев Дмитрий Андреевич", "living", "identity-confirmed")
+        dup = self.person("Корнев Дмитрий (анкета)", "living", "candidate")
+        self.kin("person", "merge", dup, main, "--force", "--reason", "тест")
+        terms = publish.forbidden_terms(Case(self.case), dict.fromkeys([main, dup], ""))
+        import re
+        self.assertTrue(any(re.search(t, f"id {dup}") for t in terms))
+        self.assertTrue(any(re.search(t, "Корнева Дмитрия", re.IGNORECASE) for t in terms))
+
+    def test_serve_refuses_private_on_external_host(self):
+        res = self.kin("site", "serve", "--host", "0.0.0.0", "--i-know-its-public", ok=False)
+        self.assertNotEqual(res.returncode, 0)
+
+    def test_serve_rejects_foreign_host_header(self):
+        import http.client
+        import socket
+        import threading
+        import time
+        from kin import site as site_mod
+        self.kin("site", "build")
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        threading.Thread(target=site_mod.serve, args=(Case(self.case), "private", port), daemon=True).start()
+        for _ in range(50):
+            try:
+                socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
+                break
+            except OSError:
+                time.sleep(0.05)
+
+        def get(host):
+            c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            c.request("GET", "/tree.json", headers={"Host": host})
+            r = c.getresponse()
+            r.read()
+            return r.status
+        self.assertEqual(get(f"127.0.0.1:{port}"), 200)
+        self.assertEqual(get(f"evil.example:{port}"), 421)
+
+
 class TestDemo(unittest.TestCase):
     """Сценарий переносимости: демо-дело строится с нуля только командами kin."""
 

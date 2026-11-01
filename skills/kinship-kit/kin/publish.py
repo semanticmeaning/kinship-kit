@@ -22,6 +22,14 @@ PHONE_RE = re.compile(r"(?<![\w-])(?:\+\d[\d\s()-]{8,}\d|8\s?\(?\d{3}\)?[\s-]?\d
 PATH_RE = re.compile(r"(?:/root/|/home/|/Users/|[A-Za-z]:\\\\|journal\.jsonl|\bsources/|\.kin/)")
 
 
+def latest_birth_year(value: str) -> int | None:
+    """Самый поздний возможный год рождения; None, если верхней границы нет («1900/..», пусто) — тогда скрываем."""
+    d = edtf.parse(value)
+    if not d or d.get("unknown") or not d.get("end"):
+        return None
+    return d["end"]["year"]
+
+
 def person_visible(p: dict, profile: str, cutoff_years: int, this_year: int | None = None) -> tuple[bool, str]:
     """(видно ли, причина). При сомнении — скрыть."""
     this_year = this_year or dt.date.today().year
@@ -37,10 +45,10 @@ def person_visible(p: dict, profile: str, cutoff_years: int, this_year: int | No
         return False, "живой"
     if p["living_status"] == "deceased":
         return True, ""
-    by = edtf.years(p.get("birth_estimate", ""))[1] or edtf.years(p.get("birth_estimate", ""))[0]
     if p.get("death_estimate"):
         return True, ""
-    if by and by < this_year - cutoff_years:
+    by = latest_birth_year(p.get("birth_estimate", ""))
+    if by is not None and by < this_year - cutoff_years:
         return True, ""
     return False, "статус жизни неизвестен и рождение не раньше чем {} лет назад".format(cutoff_years)
 
@@ -175,8 +183,8 @@ def forbidden_terms(case: Case, hidden: dict) -> list[str]:
     persons = case.index("persons")
     for pid in hidden:
         p = persons[pid]
-        if p["status"] == "duplicate":
-            continue  # дубликат виден под ID основной записи — это не утечка
+        if p["status"] == "duplicate" and case.resolve_person(pid) not in hidden:
+            continue  # дубликат видимого человека показан под ID основной записи — это не утечка
         terms.add(r"(?<![\w-])" + re.escape(pid) + r"(?!\d)")
         for name in [p["preferred_label"]] + split_ids(p.get("name_variants")):
             words = [w for w in re.sub(r"\([^)]*\)", " ", name).split() if len(w) > 1]

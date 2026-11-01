@@ -109,8 +109,26 @@ def build(case: Case, profile: str = "private") -> Path:
 
 
 class _Quiet(http.server.SimpleHTTPRequestHandler):
+    allowed_hosts: frozenset = frozenset()
+
     def log_message(self, fmt, *args):  # без журнала запросов в консоли
         pass
+
+    def _host_ok(self) -> bool:
+        """Защита от DNS rebinding: чужой сайт не может читать localhost-сборку через свой домен."""
+        return not self.allowed_hosts or (self.headers.get("Host") or "").lower() in self.allowed_hosts
+
+    def do_GET(self):
+        if not self._host_ok():
+            self.send_error(421, "Misdirected Request")
+            return
+        super().do_GET()
+
+    def do_HEAD(self):
+        if not self._host_ok():
+            self.send_error(421, "Misdirected Request")
+            return
+        super().do_HEAD()
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
@@ -122,7 +140,10 @@ def serve(case: Case, profile: str = "private", port: int = 8080, host: str = "1
     out = case.root / "site" / profile
     if not (out / "index.html").is_file():
         out = build(case, profile)
-    handler = functools.partial(_Quiet, directory=str(out))
+    loopback = host in ("127.0.0.1", "localhost", "::1")
+    hosts = frozenset({f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}) if loopback else frozenset()
+    handler_cls = type("_Handler", (_Quiet,), {"allowed_hosts": hosts})
+    handler = functools.partial(handler_cls, directory=str(out))
     with http.server.ThreadingHTTPServer((host, port), handler) as httpd:
         print(f"Схема ({profile}): http://{host}:{port}/   (Ctrl+C — остановить)")
         try:
