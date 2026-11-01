@@ -257,6 +257,46 @@ class TestPublication(Base):
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("скрытое сведение", res.stderr)
 
+    def test_leak_checker_catches_realistic_variants(self):
+        hidden = self.person("Иванова (Сидорова) Мария Фёдоровна", "living", "identity-confirmed")
+        terms = publish.forbidden_terms(Case(self.case), {hidden: "", self.user: ""})
+        rx = [__import__("re").compile(t) for t in terms]
+        for text in ("Мария Сидорова, урождённая", "Иванова, Мария", "Марии Федоровны", "у Сидоровой Марии",
+                     "Мария, в девичестве Сидорова"):
+            self.assertTrue(any(r.search(publish._fold(text)) for r in rx), text)
+        for text in ("Сергей Петрович", "Мария Петровна Ветлугина"):
+            self.assertFalse(any(r.search(publish._fold(text)) for r in rx), text)
+        for phone in ("8-916-123-45-67", "(495) 123-45-67", "7 916 123 45 67", "+7 (916) 123-45-67"):  # check_repo: allow
+            self.assertTrue(publish.PHONE_RE.search(phone), phone)
+        for not_phone in ("02.03.1885", "1885-03-02 1921-07-10", "ф. 15, оп. 2, д. 41, л. 7"):
+            self.assertFalse(publish.PHONE_RE.search(not_phone), not_phone)
+
+    def test_family_source_owner_not_public(self):
+        a = json.loads(self.kin("source", "add", "--url", "https://disk.example.org/s/abc", "--title", "Письмо",
+                                "--kind", "letter", "--repository", "Архив семьи Ветлугиных", "--group", "l1",
+                                "--json").stdout)["artifact_id"]
+        self.kin("claim", "add", "--type", "residence", "--subject", self.grand, "--statement", "Жил в Кленовке",
+                 "--sources", a, "--status", "single-source")
+        data, _ = publish.build(Case(self.case), "public")
+        src = next(s for s in data["sources"] if s["id"] == a)
+        self.assertEqual((src["repository"], src["url"]), ("", ""))
+        self.assertIsNone(data["meta"]["hidden_persons"])
+
+    def test_merge_cannot_bypass_via_update(self):
+        p = self.person("Дубль")
+        res = self.kin("update", p, "status=duplicate", f"merged_into={self.grand}", "merge_rationale=x", ok=False)
+        self.assertNotEqual(res.returncode, 0)
+
+    def test_stale_public_build_removed_on_failure(self):
+        self.kin("site", "build", "--profile", "public")
+        tree = self.case / "site" / "public" / "tree.json"
+        self.assertIn(self.grand, tree.read_text(encoding="utf-8"))
+        self.kin("update", self.grand, "publication=deny")
+        self.kin("rel", "add", self.grand, "sibling-of", self.unknown, "--status", "single-source")  # ошибка аудита
+        self.assertNotEqual(self.kin("site", "build", "--profile", "public", ok=False).returncode, 0)
+        self.assertFalse(tree.exists())
+        self.assertFalse((self.case / "publish" / "public" / "data.json").exists())
+
     def test_leak_of_phone_breaks_build(self):
         res = self._leaks("Сведения от родственника, тел. +7 900 123-45-67")  # check_repo: allow
         self.assertIn("телефон", res.stderr)
@@ -291,8 +331,8 @@ class TestPrivacyEdgeCases(Base):
         self.kin("person", "merge", dup, main, "--force", "--reason", "тест")
         terms = publish.forbidden_terms(Case(self.case), dict.fromkeys([main, dup], ""))
         import re
-        self.assertTrue(any(re.search(t, f"id {dup}") for t in terms))
-        self.assertTrue(any(re.search(t, "Корнева Дмитрия", re.IGNORECASE) for t in terms))
+        self.assertTrue(any(re.search(t, publish._fold(f"id {dup}")) for t in terms))
+        self.assertTrue(any(re.search(t, publish._fold("Корнева Дмитрия")) for t in terms))
 
     def test_serve_refuses_private_on_external_host(self):
         res = self.kin("site", "serve", "--host", "0.0.0.0", "--i-know-its-public", ok=False)

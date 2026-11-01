@@ -12,6 +12,7 @@ from .store import REGISTERS, Case, sha256_file, split_ids
 
 CORROBORATED = {"corroborated", "strongly-corroborated"}
 CLOSED_CLAIM = {"rejected", "superseded"}
+UNSOURCED_OK = {"hypothesis", "rejected", "superseded"}  # остальные статусы требуют источников
 DATE_FACTS = {"birth", "baptism", "death", "burial", "marriage"}
 
 
@@ -85,8 +86,8 @@ def run(case: Case) -> dict:
         sup = split_ids(c.get("artifact_ids"))
         con = split_ids(c.get("contradicting_artifact_ids"))
         groups = _groups(sup, artifacts)
-        if status not in {"hypothesis", "rejected", "superseded", "unresolved"} and not sup:
-            errors.append(f"{cid}: статус {status} без источников (artifact_ids); без источника — только hypothesis")
+        if status not in UNSOURCED_OK and not sup:
+            errors.append(f"{cid}: статус {status} без источников (artifact_ids); без источника — только hypothesis/rejected/superseded")
         if set(sup) & set(con):
             errors.append(f"{cid}: один источник одновременно «за» и «против»: {sorted(set(sup) & set(con))}")
         if status in CORROBORATED and len(groups) < 2:
@@ -131,8 +132,9 @@ def run(case: Case) -> dict:
             errors.append(f"{rid}: связь человека с самим собой")
         backing = split_ids(r.get("supporting_artifact_ids"))
         for cid in split_ids(r.get("claim_ids")):
-            backing += split_ids(claims.get(cid, {}).get("artifact_ids"))
-        if status not in {"hypothesis", "rejected", "superseded", "unresolved"} and not backing:
+            if claims.get(cid, {}).get("status") not in CLOSED_CLAIM:  # отвергнутое не подкрепляет связь
+                backing += split_ids(claims.get(cid, {}).get("artifact_ids"))
+        if status not in UNSOURCED_OK and not backing:
             errors.append(f"{rid}: статус {status} без источников — связь вносится, только если родство названо в источнике")
         groups = _groups(backing, artifacts)
         if status in CORROBORATED and len(groups) < 2:

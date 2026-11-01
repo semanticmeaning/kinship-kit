@@ -13,12 +13,19 @@ import re
 from pathlib import Path
 
 from . import edtf
-from .store import SCHEMA_VERSION, Case, KinError, now_iso, split_ids
+from .store import SCHEMA_VERSION, Case, KinError, now_iso, split_ids, split_list
 
 PROFILES = ("private", "public")
+FAMILY_KINDS = {"family-oral", "family-tree", "letter", "photo"}  # владелец/ссылка часто указывают на живых
+PUBLIC_LINE_FIELDS = ("id", "title", "state", "color")  # where/focus/surname — рабочие заметки, наружу не идут
 CLOSED = {"rejected", "superseded"}
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-PHONE_RE = re.compile(r"(?<![\w-])(?:\+\d[\d\s()-]{8,}\d|8\s?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2})(?!\w)")
+PHONE_RE = re.compile(
+    r"(?<![\w-])(?:"
+    r"\+\d[\d\s()-]{8,}\d"                                               # +7 916 123-45-67, +49 … (check_repo: allow)
+    r"|[78][\s-]?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}"            # 8 (916) 123-45-67, 8-916-…, 7 916 … (check_repo: allow)
+    r"|\(\d{3,5}\)\s?\d{1,3}[\s-]?\d{2}[\s-]?\d{2}"                        # (495) 123-45-67 (check_repo: allow)
+    r")(?![\w-])")
 PATH_RE = re.compile(r"(?:/root/|/home/|/Users/|[A-Za-z]:\\\\|journal\.jsonl|\bsources/|\.kin/)")
 
 
@@ -56,7 +63,11 @@ def person_visible(p: dict, profile: str, cutoff_years: int, this_year: int | No
 def build(case: Case, profile: str) -> dict:
     if profile not in PROFILES:
         raise KinError(f"Профиль {profile!r}: допустимо {', '.join(PROFILES)}")
-    cutoff = int(case.config.get("privacy", {}).get("living_cutoff_years", 100))
+    try:
+        cutoff = int(case.config.get("privacy", {}).get("living_cutoff_years", 100))
+    except (TypeError, ValueError):
+        raise KinError("case.json: privacy.living_cutoff_years должно быть целым числом") from None
+    lang = case.config.get("language", "ru")
     public = profile == "public"
     persons_all = case.index("persons")
     visible, hidden = {}, {}
@@ -72,9 +83,9 @@ def build(case: Case, profile: str) -> dict:
         p = persons_all[pid]
         item = {"id": pid, "label": p["preferred_label"], "sex": p.get("sex", ""), "status": p["status"],
                 "birth": p.get("birth_estimate", ""), "death": p.get("death_estimate", ""),
-                "birth_h": edtf.human(p.get("birth_estimate", ""), case.config.get("language", "ru")) if p.get("birth_estimate") else "",
-                "death_h": edtf.human(p.get("death_estimate", ""), case.config.get("language", "ru")) if p.get("death_estimate") else "",
-                "variants": split_ids(p.get("name_variants")), "places": split_ids(p.get("places")),
+                "birth_h": edtf.human(p.get("birth_estimate", ""), lang) if p.get("birth_estimate") else "",
+                "death_h": edtf.human(p.get("death_estimate", ""), lang) if p.get("death_estimate") else "",
+                "variants": split_list(p.get("name_variants")), "places": split_list(p.get("places")),
                 "line": p.get("line", "")}
         if not public:
             item["living"] = p["living_status"]
@@ -90,7 +101,7 @@ def build(case: Case, profile: str) -> dict:
         sup, con = split_ids(c.get("artifact_ids")), split_ids(c.get("contradicting_artifact_ids"))
         used_sources.update(sup + con)
         claims.append({"id": c["claim_id"], "type": c["claim_type"], "subjects": subjects, "statement": c["statement"],
-                       "date": c.get("date", ""), "date_h": edtf.human(c["date"]) if c.get("date") else "",
+                       "date": c.get("date", ""), "date_h": edtf.human(c["date"], lang) if c.get("date") else "",
                        "place": c.get("place", ""), "status": c["status"], "confidence": c.get("confidence", ""),
                        "sources": sup, "against": con, "competing": split_ids(c.get("competing_claim_ids")),
                        "rationale": c.get("rationale", "")})
@@ -117,9 +128,13 @@ def build(case: Case, profile: str) -> dict:
         a = artifacts.get(aid)
         if not a:
             continue
-        sources.append({"id": aid, "title": a["title"], "kind": a["kind"], "repository": a.get("repository", ""),
+        family = public and a["kind"] in FAMILY_KINDS
+        url = a.get("url", "")
+        sources.append({"id": aid, "title": a["title"], "kind": a["kind"],
+                        "repository": "" if family else a.get("repository", ""),
                         "reference": a.get("archival_reference", ""), "date": a.get("record_date", ""),
-                        "url": a.get("url", ""), "group": a.get("independence_group", "") if not public else ""})
+                        "url": url if url.startswith(("http://", "https://")) and not family else "",
+                        "group": a.get("independence_group", "") if not public else ""})
 
     hypotheses = []
     if not public:
@@ -132,7 +147,9 @@ def build(case: Case, profile: str) -> dict:
     return {
         "meta": {"title": case.config.get("title", ""), "profile": profile, "built_at": now_iso(),
                  "schema_version": SCHEMA_VERSION, "root": root, "root_gen_offset": root_offset, "language": case.config.get("language", "ru"),
-                 "lines": case.config.get("lines", []), "hidden_persons": len(hidden)},
+                 "lines": [{k: l.get(k, "") for k in PUBLIC_LINE_FIELDS} for l in case.config.get("lines", [])]
+                 if public else case.config.get("lines", []),
+                 "hidden_persons": None if public else len(hidden)},
         "persons": persons, "claims": claims, "relationships": rels, "sources": sources, "hypotheses": hypotheses,
     }, hidden
 
@@ -170,47 +187,52 @@ def _visible_root(case: Case, visible: dict) -> tuple[str, int]:
     return "", 0
 
 
+def _fold(text: str) -> str:
+    """Нормализация для сравнения: регистр, ё→е, пунктуация → пробел."""
+    return re.sub(r"[^\w]+", " ", text.casefold().replace("ё", "е")).strip()
+
+
 def _stem(word: str) -> str:
-    """Грубая основа для русских падежей: «Сергеевна/Сергеевны/Сергеевной» → «Сергеевн»."""
-    w = word.strip(".,;:()«»\"'")
-    return w[:-2] if len(w) > 5 else (w[:-1] if len(w) > 3 else w)
+    """Грубая основа для русских падежей: «сергеевна/сергеевны/сергеевной» → «сергеевн»."""
+    return word[:-2] if len(word) > 5 else (word[:-1] if len(word) > 3 else word)
+
+
+NAME_WINDOW = 3  # сколько посторонних слов допускается между частями имени
 
 
 def forbidden_terms(case: Case, hidden: dict) -> list[str]:
-    """Регулярные выражения того, чего не должно быть в сборке: ID скрытых людей и их имена
-    в любом падеже — пары «Имя Отчество», «Фамилия Имя», «Имя Фамилия»."""
+    """Регулярные выражения (по нормализованному тексту, см. _fold) того, чего не должно быть в сборке:
+    ID скрытых людей и их имена в любом падеже и порядке — любые две части ФИО (включая девичью фамилию
+    из скобок и варианты), разделённые не более чем NAME_WINDOW словами. Одиночное слово не проверяется:
+    фамилия и имя у видимых родственников часто те же (см. ограничения в docs/ARCHITECTURE.md)."""
     terms = set()
     persons = case.index("persons")
     for pid in hidden:
         p = persons[pid]
         if p["status"] == "duplicate" and case.resolve_person(pid) not in hidden:
             continue  # дубликат видимого человека показан под ID основной записи — это не утечка
-        terms.add(r"(?<![\w-])" + re.escape(pid) + r"(?!\d)")
-        for name in [p["preferred_label"]] + split_ids(p.get("name_variants")):
-            words = [w for w in re.sub(r"\([^)]*\)", " ", name).split() if len(w) > 1]
-            stems = [_stem(w) for w in words]
-            pairs = []
-            if len(stems) >= 3:
-                pairs += [(stems[1], stems[2]), (stems[0], stems[1]), (stems[1], stems[0])]
-            elif len(stems) == 2:
-                pairs += [(stems[0], stems[1]), (stems[1], stems[0])]
-            elif len(stems) == 1 and len(words[0]) >= 5:
-                pairs.append((stems[0], None))
-            for a, b in pairs:
-                rx = r"\b" + re.escape(a) + r"\w*"
-                if b:
-                    rx += r"\s+" + re.escape(b) + r"\w*"
-                terms.add(rx)
+        terms.add(r"(?<![\w-])" + re.escape(pid.casefold()).replace("\\-", "[ -]") + r"(?!\d)")
+        for name in [p["preferred_label"]] + split_list(p.get("name_variants")):
+            words = [w for w in _fold(name).split() if len(w) > 1 and not w.isdigit()]
+            stems = list(dict.fromkeys(_stem(w) for w in words))
+            gap = r"\w*(?:\s+\w+){0,%d}\s+" % NAME_WINDOW
+            for i, a in enumerate(stems):
+                for b in stems[i + 1:]:
+                    for x, y in ((a, b), (b, a)):
+                        terms.add(r"\b" + re.escape(x) + gap + re.escape(y) + r"\w*")
+            if len(stems) == 1 and len(words[0]) >= 5:
+                terms.add(r"\b" + re.escape(stems[0]) + r"\w*")
     return sorted(terms)
 
 
 def check_leaks(paths: list[Path], terms: list[str]) -> list[str]:
     problems = []
-    compiled = [re.compile(t, re.IGNORECASE) for t in terms]
+    compiled = [re.compile(t) for t in terms]
     for path in paths:
         text = path.read_text(encoding="utf-8", errors="replace")
+        folded = _fold(text)
         for rx in compiled:
-            m = rx.search(text)
+            m = rx.search(folded)
             if m:
                 problems.append(f"{path.name}: найдено скрытое сведение «{m.group(0)}»")
         for rx, label in ((EMAIL_RE, "e-mail"), (PHONE_RE, "телефон"), (PATH_RE, "локальный путь")):
@@ -221,10 +243,11 @@ def check_leaks(paths: list[Path], terms: list[str]) -> list[str]:
 
 
 def write(case: Case, profile: str) -> tuple[Path, dict, list[str]]:
-    data, hidden = build(case, profile)
     out = case.root / "publish" / profile
-    out.mkdir(parents=True, exist_ok=True)
     path = out / "data.json"
+    path.unlink(missing_ok=True)  # старый набор не должен пережить неудачную сборку
+    data, hidden = build(case, profile)
+    out.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     problems = check_leaks([path], forbidden_terms(case, hidden))
     if problems:

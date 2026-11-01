@@ -39,6 +39,11 @@ def split_ids(value: str) -> list[str]:
     return [p.strip() for p in (value or "").replace(",", SEP).split(SEP) if p.strip()]
 
 
+def split_list(value: str) -> list[str]:
+    """Списки свободного текста (имена, места) — только через «;»: запятая — часть значения («Саратов, Россия»)."""
+    return [p.strip() for p in (value or "").split(SEP) if p.strip()]
+
+
 def join_ids(items) -> str:
     return SEP.join(dict.fromkeys(i for i in items if i))
 
@@ -92,6 +97,7 @@ class Case:
         if version != SCHEMA_VERSION:
             raise KinError(f"Версия схемы дела {version}, версия kin {SCHEMA_VERSION}: нужна миграция (kin migrate).")
         self._cache: dict[str, list[dict]] = {}
+        self._lock_depth = 0
 
     # ---------- чтение ----------
     def path(self, register: str) -> Path:
@@ -176,7 +182,15 @@ class Case:
     # ---------- запись ----------
     @contextlib.contextmanager
     def lock(self, timeout: float = 30.0):
-        """Межпроцессная блокировка дела: два агента не пишут реестры одновременно."""
+        """Межпроцессная блокировка дела: два агента не пишут реестры одновременно.
+        Повторно входимая: составная операция (копия файла + запись) держит её целиком."""
+        if self._lock_depth:
+            self._lock_depth += 1
+            try:
+                yield
+            finally:
+                self._lock_depth -= 1
+            return
         lock_dir = self.root / ".kin"
         lock_dir.mkdir(exist_ok=True)
         lock = lock_dir / "write.lock"
@@ -190,19 +204,32 @@ class Case:
             except FileExistsError:
                 try:
                     if time.time() - lock.stat().st_mtime > 600:  # брошенная блокировка
-                        lock.unlink()
+                        # переименование атомарно: снять чужую брошенную блокировку сможет только один процесс
+                        os.rename(lock, lock_dir / f"write.lock.stale-{os.getpid()}")
+                        (lock_dir / f"write.lock.stale-{os.getpid()}").unlink()
                         continue
                 except FileNotFoundError:
                     continue
                 if time.monotonic() > deadline:
                     raise KinError(f"Дело занято другой записью ({lock}). Если процесс завис — удалите файл.")
                 time.sleep(0.1)
+        self._lock_depth = 1
         try:
             self._cache.clear()  # перечитать актуальное под блокировкой
+            self.config = json.loads((self.root / CASE_FILE).read_text(encoding="utf-8"))
             yield
         finally:
+            self._lock_depth = 0
             with contextlib.suppress(FileNotFoundError):
                 lock.unlink()
+
+    def save_config(self, actor: str, op: str, data: dict) -> None:
+        """Атомарная запись case.json; вызывать под lock() после изменения self.config."""
+        path = self.root / CASE_FILE
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(self.config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
+        self.journal(actor, op, CASE_FILE, data)
 
     def _write(self, register: str, rows: list[dict]) -> None:
         p = self.path(register)
@@ -250,9 +277,11 @@ class Case:
             self.journal(actor, "add", rid, {k: v for k, v in row.items() if v and k != reg["id"]})
         return row
 
-    def update(self, identifier: str, changes: dict, actor: str = "user") -> dict:
+    def update(self, identifier: str, changes: dict, actor: str = "user", append: dict | None = None) -> dict:
+        """Изменить поля; append — добавить ID в списки (читается и пишется под одной блокировкой)."""
         register = register_by_prefix(identifier)
         changes = self._clean(register, changes)
+        append = self._clean(register, append or {})
         id_field = REGISTERS[register]["id"]
         if id_field in changes:
             raise KinError("ID не меняется. Для исправления отождествления — merge/split.")
@@ -262,6 +291,10 @@ class Case:
             rows = [dict(r) for r in self.rows(register)]
             for row in rows:
                 if row[id_field] == identifier:
+                    for k, v in append.items():
+                        changes[k] = join_ids(split_ids(row.get(k, "")) + split_ids(v))
+                    if not changes:
+                        raise KinError("Нечего менять: укажите поле=значение")
                     before = {k: row[k] for k in changes}
                     row.update(changes)
                     errors = self.validate(register, row)

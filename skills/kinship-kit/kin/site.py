@@ -78,20 +78,23 @@ def generations(data: dict) -> dict[str, int | None]:
 
 
 def _p(data: dict, pid: str) -> dict:
-    for p in data["persons"]:
-        if p["id"] == pid:
-            return p
-    raise KinError(f"{pid} нет в публикационном наборе")
+    index = data.get("_by_id")
+    if index is None:
+        index = data["_by_id"] = {p["id"]: p for p in data["persons"]}
+    if pid not in index:
+        raise KinError(f"{pid} нет в публикационном наборе")
+    return index[pid]
 
 
 def build(case: Case, profile: str = "private") -> Path:
+    out = case.root / "site" / profile
+    if out.exists():  # удалить до сборки: при ошибке не должна остаться прежняя (возможно, устаревшая) версия
+        shutil.rmtree(out)
     _, data, hidden = publish.write(case, profile)
     gen = generations(data)
+    data.pop("_by_id", None)
     for p in data["persons"]:
         p["gen"] = gen[p["id"]]
-    out = case.root / "site" / profile
-    if out.exists():
-        shutil.rmtree(out)
     out.mkdir(parents=True)
     (out / "tree.json").write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     shutil.copy(WEB / "index.html", out / "index.html")

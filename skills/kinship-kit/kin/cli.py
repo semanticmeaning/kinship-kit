@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, audit, publish, site, status
-from .store import (REGISTERS, SCHEMA, Case, KinError, field_names, find_case_dir, init_case, join_ids,
+from .store import (REGISTERS, SCHEMA, Case, KinError, field_names, find_case_dir, init_case,
                     register_by_prefix, sha256_file, split_ids)
 
 # ---------------------------------------------------------------- помощники
@@ -105,34 +105,37 @@ def cmd_source_add(args) -> int:
     src = Path(args.file).expanduser() if args.file else None
     if src is None and not values.get("url") and not values.get("archival_reference"):
         raise KinError("Нужен файл, --url или --ref: источник без происхождения не регистрируется.")
-    if src is not None:
-        if not src.is_file():
-            raise KinError(f"Файл не найден: {src}")
-        digest = sha256_file(src)
-        for a in case.rows("artifacts"):
-            if a.get("sha256") == digest:
-                raise KinError(f"Этот файл уже зарегистрирован как {a['artifact_id']} ({a['file']})")
-        values.setdefault("title", src.stem)
-        values["sha256"] = digest
+    if src is not None and not src.is_file():
+        raise KinError(f"Файл не найден: {src}")
+    digest = sha256_file(src) if src is not None else ""
+    dest = None
+    # проверка дубля, выдача ID, копия и запись — под одной блокировкой (несколько агентов)
     with case.lock():
-        aid = case.next_id("artifacts")
-    if src is not None:
-        dest = case.root / "sources" / f"{aid}__{_safe_name(src.name)}"
-        if dest.exists():
-            raise KinError(f"{dest.name} уже существует — повторите команду")
-        shutil.copy2(src, dest)
-        os.chmod(dest, 0o444)
-        values["file"] = dest.relative_to(case.root).as_posix()
-    values["artifact_id"] = aid
-    if not values.get("independence_group"):
-        values["independence_group"] = aid  # по умолчанию — своя группа; копии того же документа укажите явно
-    try:
-        row = case.add("artifacts", values, _actor(args))
-    except KinError:
         if src is not None:
-            Path(case.root / values["file"]).chmod(0o644)
-            Path(case.root / values["file"]).unlink(missing_ok=True)
-        raise
+            for a in case.rows("artifacts"):
+                if a.get("sha256") == digest:
+                    raise KinError(f"Этот файл уже зарегистрирован как {a['artifact_id']} ({a['file']})")
+            values.setdefault("title", src.stem)
+            values["sha256"] = digest
+        aid = case.next_id("artifacts")
+        values["artifact_id"] = aid
+        if src is not None:
+            dest = case.root / "sources" / f"{aid}__{_safe_name(src.name)}"
+            if dest.exists():
+                raise KinError(f"{dest.name} уже существует в sources/ без записи в реестре — проверьте kin audit")
+            shutil.copy2(src, dest)
+            os.chmod(dest, 0o444)
+            values["file"] = dest.relative_to(case.root).as_posix()
+        try:
+            row = case.add("artifacts", values, _actor(args))
+        except KinError:
+            if dest is not None:  # файл создан этой же командой под блокировкой — удалить безопасно
+                dest.chmod(0o644)
+                dest.unlink(missing_ok=True)
+            raise
+    if not row.get("independence_group"):
+        print("Внимание: не указана --group (группа независимости) — источник не засчитывается в кроссподтверждение. "
+              f"Укажите: kin update {aid} independence_group=<группа>", file=sys.stderr)
     _print_row(args, row)
     return 0
 
@@ -158,6 +161,7 @@ def _add(register: str, mapping: dict):
     def run(args) -> int:
         case = _case(args)
         values = _collect(args, mapping)
+        _guard_merge(register, values)
         if register == "mentions" and values.get("person_id") and not values.get("link_status"):
             values["link_status"] = "possible"
         row = case.add(register, values, _actor(args))
@@ -181,21 +185,27 @@ def cmd_add(args) -> int:
         raise KinError(f"Нет реестра {args.register!r}: {', '.join(REGISTERS)}")
     values = json.loads(args.json_data) if args.json_data else {}
     values.update(_pairs(args.set))
+    _guard_merge(args.register, values)
     row = case.add(args.register, values, _actor(args))
     _print_row(args, row)
     return 0
 
 
+MERGE_FIELDS = {"merged_into"}
+
+
+def _guard_merge(register: str, values: dict) -> None:
+    """Слияние — только командой kin person merge (проверяет основание тождества)."""
+    if register == "persons" and (MERGE_FIELDS & set(values) or values.get("status") == "duplicate"):
+        raise KinError("Слияние людей — только командой kin person merge (нужно основание тождества).")
+
+
 def cmd_update(args) -> int:
     case = _case(args)
     changes = _pairs(args.pairs)
-    for item in args.append or []:
-        k, v = item.split("=", 1)
-        _, row = case.get(args.id)
-        changes[k] = join_ids(split_ids(row.get(k, "")) + split_ids(v))
-    if not changes:
-        raise KinError("Нечего менять: укажите поле=значение")
-    row = case.update(args.id, changes, _actor(args))
+    append = _pairs(args.append)
+    _guard_merge(register_by_prefix(args.id), {**changes, **append})
+    row = case.update(args.id, changes, _actor(args), append=append)
     _print_row(args, row, "обновлено")
     return 0
 
@@ -312,29 +322,27 @@ CASE_KEYS = {"title": str, "language": str, "root_person": str, "privacy.living_
 LINE_FIELDS = ("id", "title", "surname", "state", "where", "focus", "color")
 
 
-def _save_config(case: Case, actor: str, op: str, data: dict) -> None:
-    with case.lock():
-        path = case.root / "case.json"
-        path.write_text(json.dumps(case.config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        case.journal(actor, op, "case.json", data)
-
-
 def cmd_case_set(args) -> int:
     case = _case(args)
     changes = _pairs(args.pairs)
-    for key, value in changes.items():
-        if key not in CASE_KEYS:
-            raise KinError(f"Ключ {key!r}: допустимо {', '.join(CASE_KEYS)}")
-        if key == "root_person" and value:
-            case.get(value)
-        if key == "language" and value not in ("ru", "en"):
-            raise KinError("language: ru или en")
-        target, leaf = case.config, key
-        if "." in key:
-            head, leaf = key.split(".", 1)
-            target = case.config.setdefault(head, {})
-        target[leaf] = CASE_KEYS[key](value)
-    _save_config(case, _actor(args), "case-set", changes)
+    with case.lock():  # config перечитывается под блокировкой — чужие изменения не теряются
+        for key, value in changes.items():
+            if key not in CASE_KEYS:
+                raise KinError(f"Ключ {key!r}: допустимо {', '.join(CASE_KEYS)}")
+            if key == "root_person" and value:
+                case.get(value)
+            if key == "language" and value not in ("ru", "en"):
+                raise KinError("language: ru или en")
+            try:
+                typed = CASE_KEYS[key](value)
+            except ValueError:
+                raise KinError(f"{key}: ожидается {CASE_KEYS[key].__name__}") from None
+            target, leaf = case.config, key
+            if "." in key:
+                head, leaf = key.split(".", 1)
+                target = case.config.setdefault(head, {})
+            target[leaf] = typed
+        case.save_config(_actor(args), "case-set", changes)
     print("case.json обновлён: " + ", ".join(changes))
     return 0
 
@@ -342,26 +350,30 @@ def cmd_case_set(args) -> int:
 def cmd_line(args) -> int:
     """Линии поиска (ветви) для схемы: состояние, где ищем, цвет."""
     case = _case(args)
-    lines = case.config.setdefault("lines", [])
     values = _pairs(args.pairs)
     unknown = set(values) - set(LINE_FIELDS)
     if unknown:
         raise KinError(f"Поля линии: {', '.join(LINE_FIELDS)}")
     if args.action == "list":
+        lines = case.config.get("lines", [])
         _out(args, lines, "\n".join(f"{l['id']}: {l.get('title', '')} — {l.get('state', '')}" for l in lines) or "(нет линий)")
         return 0
     if not re.fullmatch(r"[a-z0-9-]+", args.id or ""):
         raise KinError("ID линии — латиница, цифры, дефис")
-    existing = next((l for l in lines if l["id"] == args.id), None)
-    if args.action == "add":
-        if existing:
-            raise KinError(f"Линия {args.id} уже есть")
-        lines.append({"id": args.id, **values})
-    else:
-        if not existing:
-            raise KinError(f"Нет линии {args.id}")
-        existing.update(values)
-    _save_config(case, _actor(args), f"line-{args.action}", {"id": args.id, **values})
+    if "color" in values and not re.fullmatch(r"#[0-9a-fA-F]{3,8}", values["color"]):
+        raise KinError("color — в формате #b5651d")
+    with case.lock():
+        lines = case.config.setdefault("lines", [])
+        existing = next((l for l in lines if l["id"] == args.id), None)
+        if args.action == "add":
+            if existing:
+                raise KinError(f"Линия {args.id} уже есть")
+            lines.append({"id": args.id, **values})
+        else:
+            if not existing:
+                raise KinError(f"Нет линии {args.id}")
+            existing.update(values)
+        case.save_config(_actor(args), f"line-{args.action}", {"id": args.id, **values})
     print(f"Линия {args.id}: сохранено")
     return 0
 
@@ -393,6 +405,9 @@ def cmd_publish(args) -> int:
 
 
 def _require_clean_audit(case: Case, args) -> None:
+    # прежние сборки удаляются до проверки: при отказе на диске не остаётся устаревшей версии
+    shutil.rmtree(case.root / "site" / args.profile, ignore_errors=True)
+    (case.root / "publish" / args.profile / "data.json").unlink(missing_ok=True)
     result = audit.run(case)
     if result["errors"] and not getattr(args, "allow_errors", False):
         raise KinError(f"Сборка остановлена: в аудите {len(result['errors'])} ошибок (kin audit). "
@@ -415,8 +430,8 @@ def cmd_site_serve(args) -> int:
         if not args.i_know_its_public or args.profile != "public":
             raise KinError("Внешний адрес — только для --profile public и с флагом --i-know-its-public. "
                            "Приватную сборку смотрите на localhost или выкладывайте за паролем (docs, этап 2).")
-    if args.rebuild or not (case.root / "site" / args.profile / "index.html").is_file():
-        _require_clean_audit(case, args)
+    if not args.no_rebuild or not (case.root / "site" / args.profile / "index.html").is_file():
+        _require_clean_audit(case, args)  # всегда свежая сборка: старая могла содержать уже скрытых людей
         site.build(case, args.profile)
     site.serve(case, args.profile, args.port, args.host)
     return 0
@@ -606,7 +621,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--profile", default="private", choices=publish.PROFILES)
     p.add_argument("--port", type=int, default=8080)
     p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--rebuild", action="store_true")
+    p.add_argument("--no-rebuild", action="store_true", help="Показать прежнюю сборку без пересборки")
     p.add_argument("--allow-errors", action="store_true")
     p.add_argument("--i-know-its-public", action="store_true")
     _common(p)
@@ -632,4 +647,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except json.JSONDecodeError as e:
         print(f"Ошибка JSON: {e}", file=sys.stderr)
+        return 1
+    except (ValueError, OSError) as e:
+        print(f"Ошибка: {e}", file=sys.stderr)
         return 1

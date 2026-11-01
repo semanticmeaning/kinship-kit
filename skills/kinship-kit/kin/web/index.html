@@ -140,8 +140,9 @@ function init(){
   $("#zoomIn").onclick=()=>setZoom(zoom*1.15); $("#zoomOut").onclick=()=>setZoom(zoom/1.15);
   $("#lang").onclick=()=>{lang=lang==="ru"?"en":"ru";store.set("kin-lang",lang);render()};
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closePanel()});
-  const h=decodeURIComponent(location.hash.slice(1)); if(D.byId[h])selected=h;
-  window.addEventListener("hashchange",()=>{const id=decodeURIComponent(location.hash.slice(1)); if(D.byId[id])open(id)});
+  const hashId=()=>{try{return decodeURIComponent(location.hash.slice(1))}catch(e){return ""}};
+  const h=hashId(); if(D.byId[h])selected=h;
+  window.addEventListener("hashchange",()=>{const id=hashId(); if(D.byId[id])open(id)});
   render();
 }
 function setZoom(z){zoom=Math.min(2,Math.max(.4,z));$("#stage").style.transform=`scale(${zoom})`;}
@@ -232,7 +233,8 @@ function drawEdges(people,lay){
   const style={solid:`fill="none" stroke="var(--edge)" stroke-width="1.4"`,dash:`fill="none" stroke="var(--hyp)" stroke-width="1.4" stroke-dasharray="6 4"`,
     dot:`fill="none" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="2 4"`};
   for(const r of D.relationships){ if(!ids.has(r.a)||!ids.has(r.b)||r.status==="rejected"||r.status==="superseded")continue;
-    const a=pos[r.a],b=pos[r.b]; const st=(hyp(r.status)||cand(r.a)||cand(r.b))?style.dash:style.solid;
+    const evid=["single-source","corroborated","strongly-corroborated"].includes(r.status);
+    const a=pos[r.a],b=pos[r.b]; const st=(!evid||cand(r.a)||cand(r.b))?style.dash:style.solid;
     if(r.type==="parent-of") line(a.x+W/2,a.y+H,b.x+W/2,b.y,st);
     else{const [l,rr]=a.x<b.x?[a,b]:[b,a]; const y=l.y+H/2;
       parts.push(`<path d="M${l.x+W},${y} L${rr.x},${rr.y+H/2}" ${st}/>`);
