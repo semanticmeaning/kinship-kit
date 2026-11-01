@@ -71,6 +71,21 @@ class TestExchange(unittest.TestCase):
         self.assertNotEqual(res.returncode, 0)
         self.assertNotIn("P-0099", Case(self.src).index("persons"))
 
+    def test_import_rejects_paths_outside_sources(self):
+        out = Path(self.tmp.name) / "e.json"
+        run("export", "--out", str(out), case=self.src)
+        data = json.loads(out.read_text(encoding="utf-8"))
+        data["registers"]["artifacts"].append({**data["registers"]["artifacts"][0], "artifact_id": "A-0099",
+                                               "file": "sources/../../../etc/hostname", "sha256": ""})
+        data["case"]["evil_key"] = "x"
+        out.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        dst = Path(self.tmp.name) / "dst"
+        run("init", str(dst), "--no-git")
+        res = run("import", str(out), case=dst, ok=False)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("sources/", res.stderr)
+        self.assertNotIn("A-0099", Case(dst).index("artifacts"))
+
     def test_export_outside_case_only(self):
         self.assertNotEqual(run("export", "--out", str(self.src / "x.json"), case=self.src, ok=False).returncode, 0)
 
@@ -175,6 +190,10 @@ class TestFindMcpFeedbackLang(Base):
                           "params": {"name": "kin", "arguments": {"args": ["site", "serve"]}}})["result"]
         self.assertTrue(res["isError"])
         self.assertEqual(srv.handle({"jsonrpc": "2.0", "id": 5, "method": "nope"})["error"]["code"], -32601)
+        for args in (["--lang", "en", "site", "serve"], ["--case", str(self.case), "feedback", "serve"], ["mcp", "serve"]):
+            res = srv.handle({"jsonrpc": "2.0", "id": 6, "method": "tools/call",
+                              "params": {"name": "kin", "arguments": {"args": args}}})["result"]
+            self.assertTrue(res["isError"] and "Недоступно" in res["content"][0]["text"], args)
         # через настоящий stdio
         proc = subprocess.run([sys.executable, str(KIN), "mcp", "serve", "--case", str(self.case)],
                               input='{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n', capture_output=True, text=True)
@@ -231,3 +250,111 @@ class TestEnglishDemo(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStage3ReviewFixes(Base):
+    def test_gedcom_public_leak_through_conc_is_caught(self):
+        a = self.add_source("svid", group="g1")
+        vis = self.person("Ветлугин Сергей Петрович", "deceased", "identity-confirmed", "--birth", "1921")
+        self.person("Корнев Дмитрий Андреевич", "living", "family-reported")
+        self.kin("claim", "add", "--type", "residence", "--subject", vis, "--sources", a, "--status", "single-source",
+                 "--statement", "x" * 190 + "Корнев Дмитрий Андреевич, живой внук")
+        res = self.kin("gedcom", "export", "--out", str(Path(self.tmp.name) / "p.ged"), "--profile", "public", ok=False)
+        self.assertIn("скрытое сведение", res.stderr)
+
+    def test_gedcom_conc_keeps_spaces_and_bad_date_rolls_back(self):
+        text = "a" * 199 + " word"
+        lines = gedcom._lines(1, "NOTE", text)
+        node = gedcom.parse("0 @I1@ INDI\n" + "\n".join(lines) + "\n")[0]
+        self.assertEqual(node["children"][0]["value"], text)
+        ged = Path(self.tmp.name) / "bad.ged"
+        ged.write_text("0 HEAD\n0 @I1@ INDI\n1 NAME Иван /Петров/\n0 @I2@ INDI\n1 NAME Пётр /Петров/\n1 BIRT\n"
+                       "2 DATE ABT 99 JAN 1901\n0 @F1@ FAM\n1 HUSB @I1@\n1 WIFE @I1@\n0 TRLR\n", encoding="utf-8")
+        before = {p.name: p.read_bytes() for p in (self.case / "registry").iterdir()}
+        res = self.kin("gedcom", "import", str(ged), ok=False)
+        if res.returncode != 0:  # если упало — ничего не осталось
+            self.assertEqual(before, {p.name: p.read_bytes() for p in (self.case / "registry").iterdir()})
+            self.assertEqual(list((self.case / "sources").glob("A-*")), [])
+        else:  # дата не распознана — в тексте утверждения, без поля date; самосупружества нет
+            self.assertFalse(any(r["person_a_id"] == r["person_b_id"] for r in Case(self.case).rows("relationships")))
+            self.assertEqual(json.loads(self.kin("audit", "--json").stdout)["errors"], [])
+
+    def test_feedback_contacts_masked_and_title_anonymous(self):
+        self.kin("case", "set", "feedback.enabled=true")
+        p = self.person("Ветлугин Сергей")
+        fr = feedback.submit(Case(self.case), {"person_id": p, "author_name": "Дима <dima@example.org>", "consent": True,
+                                               "text": "Пишите на dima@example.org или +7 900 111-22-33"})  # check_repo: allow
+        self.kin("feedback", "accept", fr, "--by", "Исследователь")
+        art = Case(self.case).rows("artifacts")[-1]
+        self.assertNotIn("Дима", art["title"])
+        everything = "".join(f.read_text(encoding="utf-8", errors="replace") for f in self.case.rglob("*")
+                             if f.is_file() and "drafts" not in f.parts and ".git" not in f.parts)
+        self.assertNotIn("dima@example.org", everything)
+        self.assertNotIn("111-22-33", everything)
+
+    def test_json_import_rejects_malformed(self):
+        out = Path(self.tmp.name) / "e.json"
+        self.person("Иван")
+        self.kin("export", "--out", str(out))
+        self.assertNotEqual(self.kin("export", "--out", str(out), ok=False).returncode, 0)  # не перезаписывает
+        data = json.loads(out.read_text(encoding="utf-8"))
+        dst = Path(self.tmp.name) / "d"
+        run("init", str(dst), "--no-git")
+        for mutate in (lambda d: d["registers"]["persons"].append(dict(d["registers"]["persons"][0])),
+                       lambda d: d["journal"].append("x"),
+                       lambda d: d["registers"]["persons"][0].update(notes=5)):
+            bad = json.loads(json.dumps(data))
+            mutate(bad)
+            f = Path(self.tmp.name) / "bad.json"
+            f.write_text(json.dumps(bad, ensure_ascii=False), encoding="utf-8")
+            res = run("import", str(f), case=dst, ok=False)
+            self.assertNotEqual(res.returncode, 0)
+            self.assertNotIn("Traceback", res.stderr)
+        self.assertEqual(Case(dst).rows("persons"), [])
+
+    def test_restore_rejects_unlisted_files(self):
+        arch = Path(self.tmp.name) / "b.tar.gz"
+        self.kin("backup", "--out", str(arch))
+        self.assertNotEqual(self.kin("backup", "--out", str(arch), ok=False).returncode, 0)
+        bad = Path(self.tmp.name) / "bad.tar.gz"
+        with tarfile.open(arch, "r:gz") as src, tarfile.open(bad, "w:gz") as out:
+            for m in src.getmembers():
+                out.addfile(m, src.extractfile(m) if m.isfile() else None)
+            info = tarfile.TarInfo("case/.git/hooks/post-checkout")
+            info.size = 5
+            info.mode = 0o755
+            out.addfile(info, io.BytesIO(b"echo!"))
+        res = run("restore", str(bad), str(Path(self.tmp.name) / "r"), ok=False)
+        self.assertIn("лишний файл", res.stderr)
+
+    def test_mcp_invalid_messages(self):
+        srv = mcp_server.Server(str(self.case))
+        self.assertIsNone(srv.handle({"jsonrpc": "2.0", "id": 10, "result": {}}))
+        self.assertEqual(srv.handle({"jsonrpc": "2.0", "id": 11})["error"]["code"], -32600)
+        buf = io.StringIO()
+        srv.serve(io.StringIO("[]\n5\n"), buf)
+        self.assertEqual([json.loads(x)["error"]["code"] for x in buf.getvalue().splitlines()], [-32600, -32600])
+
+
+class TestGedcomAtomic(Base):
+    def test_failure_midway_leaves_no_trace_and_retry_works(self):
+        ged = Path(self.tmp.name) / "t.ged"
+        ged.write_text("0 HEAD\n0 @I1@ INDI\n1 NAME Иван /Петров/\n1 BIRT\n2 DATE 1880\n0 @I2@ INDI\n1 NAME Пётр /Петров/\n"
+                       "0 @F1@ FAM\n1 HUSB @I1@\n1 CHIL @I2@\n0 TRLR\n", encoding="utf-8")
+        before = {p.name: p.read_bytes() for p in (self.case / "registry").iterdir()}
+        journal = (self.case / "journal.jsonl").read_bytes()
+        original = gedcom._add_rel
+
+        def boom(*a, **k):
+            raise RuntimeError("сбой посреди импорта")
+        gedcom._add_rel = boom
+        try:
+            with self.assertRaises(RuntimeError):
+                gedcom.import_file(Case(self.case), ged)
+        finally:
+            gedcom._add_rel = original
+        self.assertEqual(before, {p.name: p.read_bytes() for p in (self.case / "registry").iterdir()})
+        self.assertEqual(journal, (self.case / "journal.jsonl").read_bytes())
+        self.assertEqual(list((self.case / "sources").glob("A-*")), [])
+        rep = gedcom.import_file(Case(self.case), ged)  # повтор после сбоя проходит
+        self.assertEqual((rep["persons_new"], rep["relationships"]), (2, 1))

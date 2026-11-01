@@ -56,6 +56,12 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _safe_source_path(value: str) -> bool:
+    parts = Path(value).parts
+    return bool(parts) and parts[0] == "sources" and len(parts) >= 2 and ".." not in parts \
+        and not Path(value).is_absolute() and "\\" not in value
+
+
 def register_by_prefix(identifier: str) -> str:
     for name, reg in REGISTERS.items():
         if identifier.startswith(reg["prefix"]) and identifier[len(reg["prefix"]):].isdigit():
@@ -169,6 +175,8 @@ class Case:
                 errors.append(f"{rid}.{name}: дата {value!r} не в формате YYYY[-MM[-DD]][~?] или A/B")
             elif ftype == "int" and not value.lstrip("-").isdigit():
                 errors.append(f"{rid}.{name}: ожидается целое число")
+            elif name == "file" and register == "artifacts" and not _safe_source_path(value):
+                errors.append(f"{rid}.file: путь {value!r} должен вести внутрь sources/ (без «..» и абсолютных путей)")
             elif ftype == "sha256" and not SHA_RE.match(value):
                 errors.append(f"{rid}.{name}: неверная контрольная сумма")
             elif ftype in ("ref", "refs"):
@@ -223,6 +231,24 @@ class Case:
             self._lock_depth = 0
             with contextlib.suppress(FileNotFoundError):
                 lock.unlink()
+
+    @contextlib.contextmanager
+    def transaction(self):
+        """Всё или ничего: снимок реестров, журнала и case.json; при любой ошибке — откат. Держит блокировку."""
+        with self.lock():
+            files = [self.path(n) for n in REGISTERS] + [self.root / "journal.jsonl", self.root / CASE_FILE]
+            snapshot = {f: (f.read_bytes() if f.exists() else None) for f in files}
+            try:
+                yield
+            except BaseException:
+                for f, data in snapshot.items():
+                    if data is None:
+                        f.unlink(missing_ok=True)
+                    else:
+                        f.write_bytes(data)
+                self._cache.clear()
+                self.config = json.loads((self.root / CASE_FILE).read_text(encoding="utf-8"))
+                raise
 
     def save_config(self, actor: str, op: str, data: dict) -> None:
         """Атомарная запись case.json; вызывать под lock() после изменения self.config."""

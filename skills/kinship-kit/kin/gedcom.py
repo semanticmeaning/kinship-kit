@@ -74,6 +74,8 @@ def ged_to_edtf(value: str) -> tuple[str, str]:
     """(дата EDTF или "", пометка для текста: календарь, нераспознанное)."""
     text = (value or "").strip()
     note = ""
+    if not text:
+        return "", ""
     if text.upper().startswith("@#DJULIAN@"):
         text, note = text[10:].strip(), "по юлианскому календарю (ст. ст.)"
     elif text.startswith("@#"):
@@ -90,10 +92,13 @@ def ged_to_edtf(value: str) -> tuple[str, str]:
         if p:
             kind = m.group(1)
             if kind in ("BEF", "TO"):
-                return f"../{p}", note
-            if kind in ("AFT", "FROM"):
-                return f"{p}/..", note
-            return p + ("?" if kind == "EST" else "~"), note
+                out = f"../{p}"
+            elif kind in ("AFT", "FROM"):
+                out = f"{p}/.."
+            else:
+                out = p + ("?" if kind == "EST" else "~")
+            if edtf.is_valid(out):
+                return out, note
     p = _point_to_edtf(up)
     if p and edtf.is_valid(p):
         return p, note
@@ -267,7 +272,16 @@ def export(case: Case, profile: str = "private", include_hypotheses: bool = Fals
         out += _lines(2, "TYPE", "kinship-kit")
     out.append("0 TRLR")
     text = "\n".join(out) + "\n"
-    problems = publish.check_leaks_text(text, publish.forbidden_terms(case, hidden)) if profile == "public" else []
+    problems = []
+    if profile == "public":  # проверяем и сам файл, и склеенные значения (CONC/CONT режут слова)
+        terms = publish.forbidden_terms(case, hidden)
+
+        def values(nodes):
+            for n in nodes:
+                yield n["value"]
+                yield from values(n["children"])
+        joined = "\n".join(values(parse(text)))
+        problems = publish.check_leaks_text(text, terms, "GEDCOM") + publish.check_leaks_text(joined, terms, "GEDCOM")
     if problems:
         raise KinError("GEDCOM (public) не выгружен — утечки:\n- " + "\n- ".join(problems))
     return text
@@ -280,11 +294,11 @@ def parse(text: str) -> list[dict]:
     """Строки GEDCOM → дерево записей верхнего уровня: {xref, tag, value, children:[...]}."""
     roots: list[dict] = []
     stack: list[tuple[int, dict]] = []
-    for raw in text.lstrip("﻿").splitlines():
-        line = raw.strip()
-        if not line:
+    for raw in text.lstrip("\ufeff").splitlines():
+        line = raw.rstrip("\r\n").lstrip()  # хвостовые пробелы — часть значения (CONC)
+        if not line.strip():
             continue
-        m = re.match(r"^(\d+)\s+(@[^@]+@\s+)?(\S+)(?:\s(.*))?$", line)
+        m = re.match(r"^(\d+)\s+(@[^@]+@\s+)?(\S+)(?: (.*))?$", line)
         if not m:
             continue
         level, xref, tag, value = int(m.group(1)), (m.group(2) or "").strip(), m.group(3).upper(), m.group(4) or ""
@@ -373,11 +387,25 @@ def import_file(case: Case, path: Path, actor: str = "user", group: str = "", dr
     if dry_run:
         return report
 
-    with case.lock():
+    created: list[Path] = []
+    try:
+        report.update(_do_import(case, path, actor, group, digest, indis, fams, plan, created))
+    except BaseException:
+        for f in created:  # файл древа, скопированный в sources/, — тоже откатываем
+            f.chmod(0o644)
+            f.unlink(missing_ok=True)
+        raise
+    return report
+
+
+def _do_import(case, path, actor, group, digest, indis, fams, plan, created) -> dict:
+    report = {"claims": 0, "relationships": 0}
+    with case.transaction():  # всё или ничего: при ошибке реестры и журнал откатываются
         aid = case.next_id("artifacts")
         safe = re.sub(r"[^\w.-]+", "_", path.name)
         dest = case.root / "sources" / f"{aid}__{safe}"
         dest.write_bytes(path.read_bytes())
+        created.append(dest)
         dest.chmod(0o444)
         try:
             case.add("artifacts", {"artifact_id": aid, "title": f"Семейное древо GEDCOM: {path.name}",
@@ -422,17 +450,13 @@ def import_file(case: Case, path: Path, actor: str = "user", group: str = "", dr
                 if cid:
                     report["claims"] += 1
                     added.setdefault(ctype, []).append(cid)
-            for ctype, ids in added.items():  # несколько версий одного события в древе — конкурирующие
-                claims_now = case.index("claims")
-                dates = {claims_now[c].get("date", "") for c in ids}
-                if len(ids) > 1 and len(dates) > 1:
-                    for cid in ids[1:]:
-                        case.update(cid, {}, actor, append={"competing_claim_ids": ids[0]})
         for f in fams:
             husb, wife = xref_to_pid.get(_val(f, "HUSB")), xref_to_pid.get(_val(f, "WIFE"))
             partners = [p for p in (husb, wife) if p]
             children = [xref_to_pid[c["value"].strip()] for c in f["children"] if c["tag"] == "CHIL"
                         and c["value"].strip() in xref_to_pid]
+            if len(partners) == 2 and partners[0] == partners[1]:
+                partners = partners[:1]  # ошибка древа: один человек в обеих ролях
             if len(partners) == 2:
                 report["relationships"] += _add_rel(case, aid, partners[0], "spouse-of", partners[1], actor)
                 for ev in f["children"]:
@@ -453,7 +477,7 @@ def _add_event(case: Case, aid: str, group: str, subjects: list[str], ctype: str
     arts = case.index("artifacts")
     for c in case.rows("claims"):  # то же событие из того же древа уже есть
         if (c["claim_type"] == ctype and split_ids(c["subject_person_ids"]) == subjects and c.get("date", "") == date
-                and c.get("place", "") == place
+                and c.get("place", "") == place and aid not in split_ids(c.get("artifact_ids"))
                 and any(arts.get(a, {}).get("independence_group") == group for a in split_ids(c.get("artifact_ids")))):
             return ""
     statement = f"По семейному древу (GEDCOM): {labels.get(ctype, ctype)}"
@@ -470,6 +494,12 @@ def _add_event(case: Case, aid: str, group: str, subjects: list[str], ctype: str
                               "date": date, "place": place, "artifact_ids": aid, "status": "single-source",
                               "confidence": "low", "rationale": "Сведения семейного древа — наводка, нужна проверка по документам"},
                    actor)
+    if ctype in ("birth", "baptism", "death", "burial", "marriage") and date:
+        rivals = [c["claim_id"] for c in case.rows("claims") if c["claim_id"] != row["claim_id"]
+                  and c["claim_type"] == ctype and split_ids(c["subject_person_ids"]) == subjects
+                  and c.get("date") and c["date"] != date and c["status"] not in CLOSED]
+        if rivals:  # другая дата того же события — конкурирующая версия, а не молчаливый дубль
+            case.update(row["claim_id"], {}, actor, append={"competing_claim_ids": rivals[0]})
     return row["claim_id"]
 
 

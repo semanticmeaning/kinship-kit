@@ -56,9 +56,9 @@ class Server:
     def run_kin(self, args: list[str], case: str | None = None) -> tuple[str, bool]:
         if not isinstance(args, list) or not all(isinstance(a, str) for a in args) or not args:
             return "args должен быть непустым массивом строк", True
-        for prefix, why in BLOCKED.items():
-            if tuple(args[:len(prefix)]) == prefix:
-                return f"Недоступно через MCP: {why}", True
+        blocked = self._blocked(args)
+        if blocked:
+            return f"Недоступно через MCP: {blocked}", True
         cmd = [sys.executable, str(KIN_PY)]
         chosen = case or self.case
         if chosen and "--case" not in args:
@@ -70,6 +70,23 @@ class Server:
             return "kin: превышено время выполнения (300 с)", True
         text = (res.stdout or "") + (("\n" + res.stderr) if res.stderr else "")
         return text.strip() or "(нет вывода)", res.returncode != 0
+
+    @staticmethod
+    def _blocked(args: list[str]) -> str:
+        """Команда определяется настоящим парсером kin (глобальные ключи перед командой не помогают обойти запрет)."""
+        import contextlib
+        import io
+        from .cli import build_parser
+        try:
+            with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+                ns = build_parser().parse_args(args)
+        except SystemExit:
+            return ""  # неверные аргументы — kin сам вернёт ошибку, ничего не запустив
+        key = (getattr(ns, "cmd", None), getattr(ns, "sub", None))
+        for prefix, why in BLOCKED.items():
+            if key[:len(prefix)] == prefix:
+                return why
+        return ""
 
     def call(self, name: str, a: dict) -> tuple[str, bool]:
         case = a.get("case")
@@ -94,6 +111,10 @@ class Server:
 
     def handle(self, msg: dict) -> dict | None:
         method, mid = msg.get("method"), msg.get("id")
+        if method is None:
+            if "result" in msg or "error" in msg:
+                return None  # ответ клиента на наш запрос — сервер запросов не шлёт, игнорируем
+            return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32600, "message": "Invalid Request"}}
         if mid is None:
             return None  # уведомление (notifications/initialized и др.)
         if method == "initialize":
@@ -131,9 +152,12 @@ class Server:
                 stdout.flush()
                 continue
             batch = msg if isinstance(msg, list) else [msg]
+            if not batch:
+                batch = [None]
             for m in batch:
                 try:
-                    reply = self.handle(m) if isinstance(m, dict) else None
+                    reply = self.handle(m) if isinstance(m, dict) else \
+                        {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid Request"}}
                 except Exception as e:  # сервер не должен падать от одного запроса
                     reply = {"jsonrpc": "2.0", "id": m.get("id") if isinstance(m, dict) else None,
                              "error": {"code": -32603, "message": f"Внутренняя ошибка: {e}"}}

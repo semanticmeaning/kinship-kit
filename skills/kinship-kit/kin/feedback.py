@@ -68,7 +68,7 @@ def submit(case: Case, payload: dict, ip: str = "") -> str:
     with case.lock():
         d = drafts_dir(case)
         today = dt.date.today().isoformat()
-        count = sum(1 for p in d.glob("FR-*/report.json")
+        count = sum(1 for p in d.rglob("FR-*/report.json")
                     if json.loads(p.read_text(encoding="utf-8")).get("received", "").startswith(today))
         if count >= int(cfg["max_per_day"]):
             raise KinError("Сегодня принято слишком много сообщений — попробуйте завтра")
@@ -79,6 +79,12 @@ def submit(case: Case, payload: dict, ip: str = "") -> str:
                   "text": text, "consent": True, "status": "pending", "ip_hash": _hash_ip(ip)}
         (target / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
     return fr
+
+
+def _mask(text: str) -> str:
+    """E-mail и телефоны из текста формы не переносятся в данные дела."""
+    from .publish import EMAIL_RE, PHONE_RE
+    return PHONE_RE.sub("[телефон скрыт]", EMAIL_RE.sub("[e-mail скрыт]", text or ""))
 
 
 def _hash_ip(ip: str) -> str:
@@ -118,14 +124,14 @@ def accept(case: Case, fr: str, by: str, actor: str) -> dict:
         persons = case.index("persons")
         pid = r.get("person_id") if r.get("person_id") in persons else ""
         aid = case.next_id("artifacts")
-        body = (f"# Сведения семьи {fr}\n\nПолучено: {r['received']}\nАвтор: {r['author_name']}\n"
+        body = (f"# Сведения семьи {fr}\n\nПолучено: {r['received']}\nАвтор: {_mask(r['author_name'])}\n"
                 + (f"О ком: {pid} {persons[pid]['preferred_label']}\n" if pid else "")
-                + f"\n{r['text']}\n")
+                + f"\n{_mask(r['text'])}\n")
         src = case.root / "sources" / f"{aid}__{fr}.md"
         src.write_text(body, encoding="utf-8")
         src.chmod(0o444)
         from .store import sha256_file
-        art = case.add("artifacts", {"artifact_id": aid, "title": f"Сведения семьи {fr} ({r['author_name']})",
+        art = case.add("artifacts", {"artifact_id": aid, "title": f"Сведения семьи {fr}",  # без имени: заголовок бывает публичным
                                      "kind": "family-oral", "originality": "family-information",
                                      "independence_group": f"family-report:{fr.lower()}", "file": src.relative_to(case.root).as_posix(),
                                      "sha256": sha256_file(src), "captured_at": r["received"][:10],
@@ -181,7 +187,11 @@ class _Handler(site._Quiet):
         if self.path.rstrip("/") not in ("/api/feedback",):
             self._json(404, {"error": "not found"})
             return
-        ip = self.headers.get("X-Forwarded-For", "").split(",")[0].strip() or self.client_address[0]
+        ip = self.client_address[0]
+        if ip in ("127.0.0.1", "::1"):  # за локальным прокси (Caddy) — адрес, который добавил прокси (правый)
+            forwarded = [x.strip() for x in self.headers.get("X-Forwarded-For", "").split(",") if x.strip()]
+            if forwarded:
+                ip = forwarded[-1]
         case = Case(self.case_root)
         limit = int(settings(case)["per_ip_per_hour"])
         with self.lock:
@@ -192,6 +202,12 @@ class _Handler(site._Quiet):
                 return
             recent.append(now)
             self.hits[ip] = recent
+            if len(self.hits) > 10_000:  # не копить адреса бесконечно
+                for key in [k for k, v in self.hits.items() if not v or now - v[-1] > 3600]:
+                    del self.hits[key]
+        if not (self.headers.get("Content-Type") or "").lower().startswith("application/json"):
+            self._json(415, {"error": "Ожидается application/json"})  # простая форма с чужого сайта так не отправит
+            return
         try:
             length = int(self.headers.get("Content-Length") or 0)
             if length <= 0 or length > 64_000:
@@ -200,8 +216,11 @@ class _Handler(site._Quiet):
             if not isinstance(payload, dict):
                 raise KinError("Неверный запрос")
             fr = submit(case, payload, ip)
-        except (KinError, ValueError) as e:
+        except KinError as e:
             self._json(400, {"error": str(e)})
+            return
+        except ValueError:
+            self._json(400, {"error": "Неверный запрос"})
             return
         self._json(200, {"ok": True, "id": fr})
 

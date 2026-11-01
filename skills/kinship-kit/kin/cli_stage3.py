@@ -22,7 +22,7 @@ def _out(args, data, text: str) -> None:
 
 
 def cmd_export(args) -> int:
-    path = exchange.write_export(_case(args), Path(args.out), args.with_files)
+    path = exchange.write_export(_case(args), Path(args.out), args.with_files, args.force)
     print(f"Экспорт: {path}" + ("" if args.with_files else " (без файлов источников — они в резервной копии: kin backup)"))
     return 0
 
@@ -61,6 +61,8 @@ def cmd_gedcom_export(args) -> int:
     case = _case(args)
     if case.root == out or case.root in out.parents:
         raise KinError("GEDCOM сохраняется вне папки дела")
+    if out.exists() and not args.force:
+        raise KinError(f"{out} уже существует — другое имя или --force")
     out.write_text(text, encoding="utf-8")
     print(f"GEDCOM ({args.profile}): {out} — лиц {text.count(' INDI')}, семей {text.count(' FAM')}. Ограничения — docs/GEDCOM.md")
     return 0
@@ -136,6 +138,7 @@ def add_commands(sub, common) -> None:
     p = sub.add_parser("export", help="Полный экспорт дела (собственный формат JSON, docs/EXPORT.md)")
     p.add_argument("--out", required=True)
     p.add_argument("--with-files", action="store_true", help="Включить файлы источников (base64)")
+    p.add_argument("--force", action="store_true", help="Перезаписать существующий файл")
     common(p)
     p.set_defaults(fn=cmd_export)
 
@@ -161,6 +164,7 @@ def add_commands(sub, common) -> None:
     p.add_argument("--out", required=True)
     p.add_argument("--profile", default="private", choices=["private", "public"])
     p.add_argument("--include-hypotheses", action="store_true")
+    p.add_argument("--force", action="store_true", help="Перезаписать существующий файл")
     common(p)
     p.set_defaults(fn=cmd_gedcom_export)
     p = g.add_parser("import")
