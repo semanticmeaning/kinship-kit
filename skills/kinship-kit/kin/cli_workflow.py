@@ -12,7 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import audit, migrations, site, workflow
+from . import audit, i18n, migrations, site, workflow
+from .i18n import t
 from .store import REGISTERS, Case, KinError, find_case_dir, split_ids
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -70,7 +71,7 @@ def _ask(prompt: str, default: str = "", required: bool = True) -> str:
             value = default
         if value or not required:
             return value
-        print("  Нужен ответ.")
+        print(i18n.setup_text("need"))
 
 
 def _git_global(key: str) -> str:
@@ -83,31 +84,34 @@ def _git_global(key: str) -> str:
 def cmd_setup(args) -> int:
     """Первый шаг: фамилия (линия поиска), название и папка дела, автор коммитов — указывает сам пользователь."""
     interactive = sys.stdin.isatty() and not args.yes
+    if args.lang:
+        i18n.set_lang(args.lang)
+    q = i18n.setup_text
     if interactive:
-        print(SETUP_QUESTIONS)
-    surname = args.surname or (interactive and _ask("1. Основная фамилия исследования (линия поиска)")) or ""
+        print(q("intro"))
+    surname = args.surname or (interactive and _ask(q("surname"))) or ""
     if not surname:
         raise KinError("Укажите --surname (основная фамилия исследования)")
-    title = args.title or (interactive and _ask("2. Название дела", f"{surname} — родословная")) or f"{surname} — родословная"
+    default_title = q("title_default", surname=surname)
+    title = args.title or (interactive and _ask(q("title"), default_title)) or default_title
     default_dir = str(Path.home() / "kinship-cases" / slug(surname))
-    case_dir = args.dir or (interactive and _ask("3. Папка дела (приватная, вне репозитория набора)", default_dir)) or default_dir
+    case_dir = args.dir or (interactive and _ask(q("dir"), default_dir)) or default_dir
     name, email = args.author_name, args.author_email
     if args.anonymous_author:
-        name, email = "Исследователь", "researcher@example.invalid"
+        name, email = q("pseudonym"), "researcher@example.invalid"
     if not (name and email) and interactive:
         g_name, g_email = _git_global("user.name"), _git_global("user.email")
-        print("4. Автор коммитов в git-истории дела. Виден всем, кому вы дадите копию дела.\n"
-              "   Можно псевдоним. " + (f"Глобальные настройки git: {g_name} <{g_email}> — используются, только если вы их введёте." if g_name else ""))
-        name = _ask("   Имя автора", "Исследователь")
-        email = _ask("   E-mail автора", "researcher@example.invalid")
+        print(q("author") + (q("author_global", name=g_name, email=g_email) if g_name else ""))
+        name = _ask(q("author_name"), q("pseudonym"))
+        email = _ask(q("author_email"), "researcher@example.invalid")
     if not (name and email):
         raise KinError("Укажите автора коммитов: --author-name и --author-email, либо --anonymous-author. "
                        "Автор не берётся из глобальных настроек git без вашего явного выбора.")
-    lang = args.lang or (interactive and _ask("5. Язык дела (ru/en)", "ru")) or "ru"
-    clients = args.agents or (interactive and _ask("6. Роли агентов для (claude, codex, both, none)", "both")) or "both"
+    lang = args.lang or (interactive and _ask(q("lang"), i18n.LANG)) or "ru"
+    clients = args.agents or (interactive and _ask(q("agents"), "both")) or "both"
     deny = not args.no_denylist
     if interactive and not args.no_denylist:
-        deny = _ask(f"7. Добавить «{surname}» в личный стоп-лист ({DENYLIST}), чтобы фамилия не попала в публичный репозиторий набора? (да/нет)", "да").casefold().startswith(("д", "y"))
+        deny = _ask(q("deny", surname=surname, path=DENYLIST), q("yes")).casefold().startswith(("д", "y"))
 
     from .cli import CASE_AGENTS_MD
     from .store import SCHEMA, init_case
@@ -165,13 +169,13 @@ def cmd_next(args) -> int:
     case = _case(args)
     ranked, excluded = workflow.rank_tasks(case)
     nxt = workflow.next_summary(case)
-    lines = [f"▶ {nxt['text']}" if nxt else "Нет доступных задач: поставьте новую (kin task new …) или разберите гипотезы."]
+    lines = [f"▶ {nxt['text']}" if nxt else t("Нет доступных задач: поставьте новую (kin task new …) или разберите гипотезы.")]
     if ranked:
-        lines.append("\nОчередь (оценка — ценность, приоритет, гипотеза, стоимость, доступ, попытки):")
-        lines += [f"- {t['id']} [{t['score']}] {t['goal']} — {', '.join(t['reasons'])}" for t in ranked[: args.limit]]
+        lines.append(f"\n{t('Очередь (оценка — ценность, приоритет, гипотеза, стоимость, доступ, попытки)')}:")
+        lines += [f"- {x['id']} [{x['score']}] {x['goal']} — {', '.join(x['reasons'])}" for x in ranked[: args.limit]]
     if excluded:
-        lines.append("\nНедоступно сейчас:")
-        lines += [f"- {t['id']} {t['goal']} — {t['reason']}" for t in excluded]
+        lines.append(f"\n{t('Недоступно сейчас')}:")
+        lines += [f"- {x['id']} {x['goal']} — {x['reason']}" for x in excluded]
     _out(args, {"next": nxt, "ranked": ranked, "excluded": excluded}, "\n".join(lines))
     return 0
 

@@ -22,7 +22,7 @@ SECRETS = [re.compile(p) for p in (r"-----BEGIN [A-Z ]*PRIVATE KEY", r"\bghp_[A-
                                     r"\bAKIA[0-9A-Z]{16}\b", r"\bxox[bp]-[\w-]{10,}")]
 PRIVATE_PATH = re.compile(r"/root/[\w.-]+/|/home/[a-z][\w-]*/|/Users/[A-Za-z][\w-]*/|[A-Z]:\\\\Users\\\\")
 ALLOW = "check_repo: allow"  # пометка в строке с намеренными тестовыми данными
-DEMO_DOCS = "examples/demo/documents/"
+DEMO_DOCS = ("examples/demo/documents/", "examples/demo/documents_en/")
 SKIP = {"tools/check_repo.py"}  # содержит сами шаблоны
 
 
@@ -59,7 +59,7 @@ def main() -> int:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-        if rel.startswith(DEMO_DOCS) and "СИНТЕТИЧЕСКИЙ" not in text:
+        if rel.startswith(DEMO_DOCS) and "СИНТЕТИЧЕСКИЙ" not in text and "SYNTHETIC" not in text:
             problems.append(f"{rel}: демо-документ без пометки [СИНТЕТИЧЕСКИЙ ДОКУМЕНТ]")
         text = "\n".join(line for line in text.splitlines() if ALLOW not in line)
         for m in EMAIL.finditer(text):

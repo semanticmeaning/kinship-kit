@@ -244,18 +244,19 @@ def run(case: Case) -> dict:
 
 
 def format_text(result: dict) -> str:
+    from .i18n import t
     c = result["counts"]
-    lines = [f"Дело: {result['case']}",
-             "Записей: " + ", ".join(f"{k}={v}" for k, v in c.items())]
+    lines = [f"{t('Дело')}: {result['case']}",
+             f"{t('Записей')}: " + ", ".join(f"{k}={v}" for k, v in c.items())]
     s = result["summary"]
-    lines.append("Утверждения: " + (", ".join(f"{k}={v}" for k, v in sorted(s["claims_by_status"].items())) or "нет"))
-    lines.append("Связи: " + (", ".join(f"{k}={v}" for k, v in sorted(s["relationships_by_status"].items())) or "нет"))
+    lines.append(f"{t('Утверждения')}: " + (", ".join(f"{k}={v}" for k, v in sorted(s["claims_by_status"].items())) or t("нет")))
+    lines.append(f"{t('Связи')}: " + (", ".join(f"{k}={v}" for k, v in sorted(s["relationships_by_status"].items())) or t("нет")))
     if result["errors"]:
-        lines.append(f"\nОШИБКИ ({len(result['errors'])}):")
+        lines.append(f"\n{t('ОШИБКИ')} ({len(result['errors'])}):")
         lines += [f"- {e}" for e in result["errors"]]
     if result["warnings"]:
-        lines.append(f"\nПРЕДУПРЕЖДЕНИЯ ({len(result['warnings'])}):")
+        lines.append(f"\n{t('ПРЕДУПРЕЖДЕНИЯ')} ({len(result['warnings'])}):")
         lines += [f"- {w}" for w in result["warnings"]]
     if not result["errors"] and not result["warnings"]:
-        lines.append("Ошибок и предупреждений нет.")
+        lines.append(t("Ошибок и предупреждений нет."))
     return "\n".join(lines)

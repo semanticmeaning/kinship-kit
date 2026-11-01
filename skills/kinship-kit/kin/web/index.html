@@ -106,7 +106,9 @@ const I18N = {
       legend:{edge:"родство по источнику",hyp:"гипотеза",ident:"возможно одно лицо",cand:"кандидат (родство не установлено)",fam:"со слов семьи / из древа"},
       st:{"tree-entry-unverified":"из древа, не проверено","family-reported":"со слов семьи",candidate:"кандидат","identity-probable":"личность вероятна","identity-confirmed":"личность подтверждена",hypothesis:"гипотеза",unlikely:"отброшен"},
       cs:{hypothesis:"гипотеза","single-source":"один источник",corroborated:"подтверждено","strongly-corroborated":"надёжно подтверждено",contradicted:"противоречие",unresolved:"не решено",rejected:"отвергнуто",superseded:"заменено"},
-      hidden:n=>`скрыто людей: ${n}`},
+      hidden:n=>`скрыто людей: ${n}`,
+      fb:{title:"Дополнить сведения",name:"Ваше имя",email:"E-mail (необязательно, для ответа)",text:"Что вы знаете об этом человеке? Даты, места, родственники, документы.",
+          consent:"Согласен(а) на обработку этих сведений исследователем семьи",send:"Отправить",ok:id=>`Спасибо! Сообщение ${id} получено — исследователь рассмотрит его.`,err:"Не отправлено: "}},
   en:{gen:{0:"Root generation","-1":"Parents","-2":"Grandparents","-3":"Great-grandparents","-4":"2× great-grandparents",1:"Children",2:"Grandchildren",3:"Great-grandchildren"},
       genN:n=>n<0?`${-n} generations up`:`${n} generations down`, unplaced:"Not placed (generation unknown)",
       showRejected:"rejected", search:"Search by name", close:"Close", claims:"Claims", rels:"Relationships",
@@ -117,7 +119,9 @@ const I18N = {
       legend:{edge:"kinship stated in a source",hyp:"hypothesis",ident:"possibly the same person",cand:"candidate (kinship not established)",fam:"family-reported / from a tree"},
       st:{"tree-entry-unverified":"tree entry, unverified","family-reported":"family-reported",candidate:"candidate","identity-probable":"identity probable","identity-confirmed":"identity confirmed",hypothesis:"hypothesis",unlikely:"rejected"},
       cs:{hypothesis:"hypothesis","single-source":"single source",corroborated:"corroborated","strongly-corroborated":"strongly corroborated",contradicted:"contradicted",unresolved:"unresolved",rejected:"rejected",superseded:"superseded"},
-      hidden:n=>`hidden people: ${n}`}
+      hidden:n=>`hidden people: ${n}`,
+      fb:{title:"Add information",name:"Your name",email:"E-mail (optional, for a reply)",text:"What do you know about this person? Dates, places, relatives, documents.",
+          consent:"I agree that the family researcher may process this information",send:"Send",ok:id=>`Thank you! Message ${id} received — the researcher will review it.`,err:"Not sent: "}}
 };
 const W=176, GAP=22, ROW=150, TOP=36, LEFT=150;
 let D, L, lang, zoom=1, selected=null;
@@ -286,10 +290,21 @@ function open(id,keep){
       ${c.against.length?`<div class="src against">${L.against}: ${c.against.map(srcLine).join("; ")}</div>`:""}
       ${c.competing.length?`<div class="compete">↔ ${L.competing}: ${c.competing.map(i=>esc(i+" "+(D.claimById[i]?.date_h||""))).join("; ")}</div>`:""}
       </div>`).join("")||`<div class="muted">${L.noClaims}</div>`}
-    ${rels?`<h3>${L.rels}</h3>${rels}`:""}${hy?`<h3>${L.hyps}</h3>${hy}`:""}`;
+    ${rels?`<h3>${L.rels}</h3>${rels}`:""}${hy?`<h3>${L.hyps}</h3>${hy}`:""}
+    ${D.meta.feedback?`<h3>${L.fb.title}</h3><form id="fb" class="claim">
+      <label>${L.fb.name}<br><input name="author_name" required maxlength="200" style="width:100%"></label><br>
+      <label>${L.fb.email}<br><input name="author_email" type="email" maxlength="320" style="width:100%"></label><br>
+      <label>${L.fb.text}<br><textarea name="text" required maxlength="5000" rows="5" style="width:100%"></textarea></label><br>
+      <label><input type="checkbox" name="consent" required> ${L.fb.consent}</label><br>
+      <button type="submit">${L.fb.send}</button> <span id="fbmsg" class="muted" role="status"></span></form>`:""}`;
   $("#panel").classList.add("open");
   $("#panel .close").onclick=closePanel;
   $("#panel").querySelectorAll("[data-go]").forEach(a=>a.onclick=e=>{e.preventDefault();open(a.dataset.go)});
+  const fb=$("#fb"); if(fb)fb.onsubmit=async e=>{e.preventDefault(); const f=new FormData(fb), msg=$("#fbmsg");
+    const body={person_id:id,author_name:f.get("author_name"),author_email:f.get("author_email"),text:f.get("text"),consent:f.get("consent")==="on"};
+    try{const r=await fetch("api/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const j=await r.json(); if(r.ok){msg.textContent=L.fb.ok(j.id);fb.reset()}else msg.textContent=L.fb.err+(j.error||r.status)}
+    catch(err){msg.textContent=L.fb.err+err.message}};
   if(!keep){const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);c&&c.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"})}
 }
 function closePanel(){selected=null;history.replaceState(null,"",location.pathname+location.search);$("#panel").classList.remove("open");document.querySelectorAll(".card.sel").forEach(c=>c.classList.remove("sel"))}

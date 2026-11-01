@@ -10,6 +10,7 @@ import json
 import re
 
 from . import audit
+from .i18n import t
 from .store import Case, KinError, split_ids
 
 DEFAULT_POLICY = {
@@ -329,14 +330,15 @@ def _attempts(task: dict) -> int:
 def task_gate(case: Case, task: dict) -> str | None:
     """Почему задачу нельзя выполнять сейчас (None — можно)."""
     lim = limits(case)
+    tid = task["task_id"]
     if task.get("user_consent") == "denied":
-        return "пользователь отказал"
+        return t("пользователь отказал")
     if task.get("cost") == "paid" and lim["paid_requires_consent"] and task.get("user_consent") != "granted":
-        return f"платно — нужно согласие пользователя (kin task consent {task['task_id']} --granted --by «Имя»)"
+        return f"{t('платно — нужно согласие пользователя')} (kin task consent {tid} --granted --by «…»)"
     if task.get("external_service") == "yes" and lim["external_services_require_consent"] and task.get("user_consent") != "granted":
-        return f"передача сведений стороннему сервису — нужно согласие (kin task consent {task['task_id']} --granted --by «Имя»)"
+        return f"{t('передача сведений стороннему сервису — нужно согласие')} (kin task consent {tid} --granted --by «…»)"
     if _attempts(task) >= int(lim["max_attempts_per_task"]):
-        return f"исчерпан лимит попыток ({_attempts(task)}/{lim['max_attempts_per_task']}) — нужен пересмотр задачи"
+        return f"{t('исчерпан лимит попыток')} ({_attempts(task)}/{lim['max_attempts_per_task']}) — {t('нужен пересмотр задачи')}"
     return None
 
 
@@ -344,51 +346,51 @@ def rank_tasks(case: Case) -> tuple[list[dict], list[dict]]:
     """(рекомендуемые по убыванию оценки, исключённые с причиной)."""
     hyps = case.index("hypotheses")
     ranked, excluded = [], []
-    for t in case.rows("tasks"):
-        if t["status"] not in OPEN_TASK:
+    for task in case.rows("tasks"):
+        if task["status"] not in OPEN_TASK:
             continue
-        gate = task_gate(case, t)
+        gate = task_gate(case, task)
         if gate:
-            excluded.append({"id": t["task_id"], "goal": t["goal"], "reason": gate})
+            excluded.append({"id": task["task_id"], "goal": task["goal"], "reason": gate})
             continue
         reasons, score = [], 0.0
         try:
-            value = int(t.get("evidential_value") or 3)
+            value = int(task.get("evidential_value") or 3)
         except ValueError:
             value = 3
         score += 2 * value
-        reasons.append(f"ценность {value}")
+        reasons.append(f"{t('ценность')} {value}")
         try:
-            prio = int(t.get("priority") or 3)
+            prio = int(task.get("priority") or 3)
         except ValueError:
             prio = 3
         score += 6 - prio
-        reasons.append(f"приоритет {prio}")
-        h = hyps.get(t.get("hypothesis_id", ""))
+        reasons.append(f"{t('приоритет')} {prio}")
+        h = hyps.get(task.get("hypothesis_id", ""))
         if h and h["status"] in ("open", "testing"):
             score += 2
-            reasons.append("активная гипотеза")
+            reasons.append(t("активная гипотеза"))
             if h.get("open_contradictions"):
                 score += 1
-                reasons.append("снимает противоречие")
-        cost = {"free": 0, "": -0.5, "unknown": -1, "paid": -3}.get(t.get("cost", ""), 0)
-        access = {"online": 0, "": -0.5, "unknown": -1, "request": -1, "onsite": -2}.get(t.get("access", ""), 0)
+                reasons.append(t("снимает противоречие"))
+        cost = {"free": 0, "": -0.5, "unknown": -1, "paid": -3}.get(task.get("cost", ""), 0)
+        access = {"online": 0, "": -0.5, "unknown": -1, "request": -1, "onsite": -2}.get(task.get("access", ""), 0)
         score += cost + access
         if cost:
-            reasons.append(f"стоимость {t.get('cost') or '?'}")
+            reasons.append(f"{t('стоимость')} {task.get('cost') or '?'}")
         if access:
-            reasons.append(f"доступ {t.get('access') or '?'}")
-        if _attempts(t):
-            score -= _attempts(t)
-            reasons.append(f"попыток {_attempts(t)}")
-        if t["status"] == "in-progress":
+            reasons.append(f"{t('доступ')} {task.get('access') or '?'}")
+        if _attempts(task):
+            score -= _attempts(task)
+            reasons.append(f"{t('попыток')} {_attempts(task)}")
+        if task["status"] == "in-progress":
             score += 5
-            reasons.append("уже начата")
-        elif t["status"] == "planned":
+            reasons.append(t("уже начата"))
+        elif task["status"] == "planned":
             score -= 1
-            reasons.append("ещё не готова")
-        ranked.append({"id": t["task_id"], "goal": t["goal"], "status": t["status"], "score": round(score, 1),
-                       "reasons": reasons, "assignee": t.get("assignee", "")})
+            reasons.append(t("ещё не готова"))
+        ranked.append({"id": task["task_id"], "goal": task["goal"], "status": task["status"], "score": round(score, 1),
+                       "reasons": reasons, "assignee": task.get("assignee", "")})
     ranked.sort(key=lambda x: (x["status"] != "in-progress", -x["score"], x["id"]))  # начатое — первым
     return ranked, excluded
 
@@ -405,33 +407,33 @@ TRANSITIONS = {
 
 def task_transition(case: Case, task_id: str, action: str, actor: str, reason: str = "",
                     evidence: list[str] | None = None, next_step: str = "") -> dict:
-    _, t = case.get(task_id)
+    _, task = case.get(task_id)
     allowed, new = TRANSITIONS[action]
-    if t["status"] not in allowed:
+    if task["status"] not in allowed:
         raise KinError(f"{task_id}: из статуса {t['status']} действие {action} невозможно")
     changes: dict = {"status": new}
     if action == "start":
-        gate = task_gate(case, t)
+        gate = task_gate(case, task)
         if gate:
             raise KinError(f"{task_id} нельзя начать: {gate}")
         changes["assignee"] = actor
     if action == "block":
         if not reason:
             raise KinError("Укажите причину блокировки --reason")
-        changes["constraints"] = "; ".join(x for x in (t.get("constraints"), reason) if x)
+        changes["constraints"] = "; ".join(x for x in (task.get("constraints"), reason) if x)
     if action in ("done", "close"):
         if not reason:
             raise KinError("Укажите причину завершения --reason")
         changes["close_reason"] = reason
-    if action == "close" and not split_ids(t.get("search_ids")):
+    if action == "close" and not split_ids(task.get("search_ids")):
         raise KinError(f"{task_id}: закрыть без находки можно только после записанного поиска "
                        "(kin search add … --task …) — иначе следующий исполнитель повторит работу")
     if evidence:
-        changes["evidence_artifact_ids"] = ";".join(dict.fromkeys(split_ids(t.get("evidence_artifact_ids")) + evidence))
+        changes["evidence_artifact_ids"] = ";".join(dict.fromkeys(split_ids(task.get("evidence_artifact_ids")) + evidence))
     if next_step:
         changes["next_step"] = next_step
     row = case.update(task_id, changes, actor)
-    decision(case, actor, task_id, {"action": action, "from": t["status"], "to": new, "reason": reason})
+    decision(case, actor, task_id, {"action": action, "from": task["status"], "to": new, "reason": reason})
     return row
 
 
@@ -526,16 +528,17 @@ def guard_search(case: Case, values: dict) -> None:
 def next_summary(case: Case) -> dict | None:
     a = audit.run(case)
     if a["errors"]:
-        return {"kind": "fix-audit", "text": f"Исправить ошибки аудита ({len(a['errors'])}): kin audit"}
+        return {"kind": "fix-audit", "text": f"{t('Исправить ошибки аудита')} ({len(a['errors'])}): kin audit"}
     pending = [r for r in case.rows("reviews") if r["status"] == "requested"]
     ranked, _ = rank_tasks(case)
     if ranked and ranked[0]["status"] == "in-progress":
-        t = ranked[0]
-        return {"kind": "continue-task", "id": t["id"], "text": f"Продолжить {t['id']}: {t['goal']}"}
+        top = ranked[0]
+        return {"kind": "continue-task", "id": top["id"], "text": f"{t('Продолжить')} {top['id']}: {top['goal']}"}
     if pending:
         r = pending[0]
-        return {"kind": "review", "id": r["review_id"], "text": f"Независимое ревью {r['review_id']} ({r['target_id']}) — роль {r.get('reviewer') or 'Evidence Reviewer'}"}
+        return {"kind": "review", "id": r["review_id"], "text": f"{t('Независимое ревью')} {r['review_id']} ({r['target_id']}) — {t('роль')} {r.get('reviewer') or 'Evidence Reviewer'}"}
     if ranked:
-        t = ranked[0]
-        return {"kind": "start-task", "id": t["id"], "text": f"Начать {t['id']} (оценка {t['score']}: {', '.join(t['reasons'])}): {t['goal']}"}
+        top = ranked[0]
+        return {"kind": "start-task", "id": top["id"],
+                "text": f"{t('Начать')} {top['id']} ({t('оценка')} {top['score']}: {', '.join(top['reasons'])}): {top['goal']}"}
     return None

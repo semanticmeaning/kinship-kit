@@ -9,7 +9,8 @@ import json
 
 import datetime as dt
 
-from . import audit, workflow
+from . import audit, feedback, workflow
+from .i18n import t
 from .store import Case, split_ids
 
 ACTIVE_H = ("open", "testing")
@@ -77,46 +78,50 @@ def collect(case: Case) -> dict:
                            "status": r["status"], "due": r.get("due_date", ""),
                            "overdue": bool(r["status"] == "sent" and r.get("due_date") and r["due_date"] < today)}
                           for r in requests],
+        "family_reports_pending": len(feedback.pending(case)),
         "next": nxt,
     }
 
 
 def format_text(s: dict) -> str:
-    out = [f"Дело: {s['case']}  ({s['path']})",
-           "Записей: " + ", ".join(f"{k}={v}" for k, v in s["counts"].items() if v),
-           f"Аудит: ошибок {s['audit']['errors']}, предупреждений {s['audit']['warnings']}"]
+    out = [f"{t('Дело')}: {s['case']}  ({s['path']})",
+           f"{t('Записей')}: " + ", ".join(f"{k}={v}" for k, v in s["counts"].items() if v),
+           f"{t('Аудит: ошибок')} {s['audit']['errors']}, {t('предупреждений')} {s['audit']['warnings']}"]
     if s["next"]:
-        out.append(f"\n▶ СЛЕДУЮЩИЙ ШАГ: {s['next']['text']}")
-    out.append(f"\nАктивные гипотезы ({len(s['active_hypotheses'])}):")
-    out += [f"- {h['id']} [{h['status']}] {h['statement']}" + (f"  → задачи {', '.join(h['tasks'])}" if h['tasks'] else "  → задач нет")
-            for h in s["active_hypotheses"]] or ["- нет"]
+        out.append(f"\n▶ {t('СЛЕДУЮЩИЙ ШАГ')}: {s['next']['text']}")
+    out.append(f"\n{t('Активные гипотезы')} ({len(s['active_hypotheses'])}):")
+    out += [f"- {h['id']} [{h['status']}] {h['statement']}"
+            + (f"  {t('→ задачи')} {', '.join(h['tasks'])}" if h['tasks'] else f"  {t('→ задач нет')}")
+            for h in s["active_hypotheses"]] or [f"- {t('нет')}"]
     labels = {"in-progress": "В работе", "in-review": "На ревью", "blocked": "Заблокировано",
               "ready": "Готово к старту", "planned": "Запланировано"}
     for key, label in labels.items():
         items = s["tasks"][key]
         if items:
-            out.append(f"\n{label} ({len(items)}):")
-            for t in items:
-                extra = f" — {t['constraints']}" if key == "blocked" and t["constraints"] else ""
-                out.append(f"- {t['id']} [p{t['priority'] or '—'}] {t['goal']}{extra}")
+            out.append(f"\n{t(label)} ({len(items)}):")
+            for task in items:
+                extra = f" — {task['constraints']}" if key == "blocked" and task["constraints"] else ""
+                out.append(f"- {task['id']} [p{task['priority'] or '—'}] {task['goal']}{extra}")
     if s["checked_negative"]:
-        out.append(f"\nПроверено без результата ({len(s['checked_negative'])}) — не повторять без нового основания:")
+        out.append(f"\n{t('Проверено без результата')} ({len(s['checked_negative'])}) — {t('не повторять без нового основания')}:")
         for n in s["checked_negative"]:
-            rep = f"; повторить, если: {n['repeat_when']}" if n["repeat_when"] else ""
+            rep = f"; {t('повторить, если')}: {n['repeat_when']}" if n["repeat_when"] else ""
             out.append(f"- {n['id']} {n['date']} {n['source']}: {n['query']} [{n['period']}] → {n['result']}{rep}")
     if s["reviews_pending"]:
-        out.append(f"\nРевью ждут ({len(s['reviews_pending'])}):")
-        out += [f"- {r['id']} → {r['target']}" + (" — нужно решение человека" if r["status"] == "passed" else "")
+        out.append(f"\n{t('Ревью ждут')} ({len(s['reviews_pending'])}):")
+        out += [f"- {r['id']} → {r['target']}" + (f" — {t('нужно решение человека')}" if r["status"] == "passed" else "")
                 for r in s["reviews_pending"]]
     if s["requests_open"]:
-        out.append(f"\nЗапросы в архивы ({len(s['requests_open'])}):")
+        out.append(f"\n{t('Запросы в архивы')} ({len(s['requests_open'])}):")
         out += [f"- {r['id']} [{r['status']}] {r['recipient']}: {r['subject']}"
-                + (f" — срок {r['due']}" if r["due"] else "") + (" — ПРОСРОЧЕН" if r["overdue"] else "")
+                + (f" — {t('срок')} {r['due']}" if r["due"] else "") + (f" — {t('ПРОСРОЧЕН')}" if r["overdue"] else "")
                 for r in s["requests_open"]]
+    if s.get("family_reports_pending"):
+        out.append(f"\n{t('Сведения семьи ждут решения')}: {s['family_reports_pending']} (kin feedback list)")
     if s["open_contradictions"]:
-        out.append(f"\nНерешённые противоречия ({len(s['open_contradictions'])}):")
+        out.append(f"\n{t('Нерешённые противоречия')} ({len(s['open_contradictions'])}):")
         out += [f"- {c['id']} {c['statement']}" for c in s["open_contradictions"]]
     if s["recent_changes"]:
-        out.append("\nПоследние изменения:")
+        out.append(f"\n{t('Последние изменения')}:")
         out += [f"- {j['ts']} {j['actor']}: {j['op']} {j['id']}" for j in s["recent_changes"]]
     return "\n".join(out)

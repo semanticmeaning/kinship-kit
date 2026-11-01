@@ -16,6 +16,7 @@ metadata:
 восстанавливается из данных, а не из памяти чата.
 
 Отвечать на языке пользователя. Поисковые запросы — на языке источника.
+English: `references/guide.en.md` (методика и команды на английском; интерфейс — `kin --lang en`).
 
 # Инструмент: `kin`
 
@@ -67,6 +68,10 @@ python3 <папка этого навыка>/kin.py <команда>      # да
 | Корень схемы, линии поиска | `kin case set root_person=P-…`, `kin case line add <id> title=… state="ищем сейчас" color=#b5651d` |
 | Сайт-схема | `kin site build [--profile public]`, `kin site serve` → http://127.0.0.1:8080, выкладка — `kin site publish --to <папка>` (только с согласия пользователя) |
 | Роли агентов | `kin agents install` → `.claude/agents/*.md`, `.codex/agents/*.toml` в папке дела |
+| Поиск по делу | `kin find <слова>` (имена в любом падеже, ё/е) |
+| Сведения семьи (форма на приватном сайте) | `kin case set feedback.enabled=true`, `kin feedback serve`, `kin feedback list|show`, решение — `kin feedback accept|reject FR-… --by «Имя»` |
+| Обмен и сохранность | `kin export --out f.json` / `kin import f.json` (без дублей), `kin gedcom export|import`, `kin backup` / `kin restore` |
+| MCP для клиентов без shell | `kin mcp config --client claude-code|claude-desktop|codex` |
 | Окружение, схема | `kin doctor`, `kin migrate [--dry-run]` |
 
 Указывайте исполнителя: `--as "Archive Researcher"` (или `KIN_ACTOR`) — попадает в журнал `journal.jsonl`.

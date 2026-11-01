@@ -69,3 +69,26 @@ kin site publish --profile public --to ~/tree-public
 ```
 Папку `~/tree-public` можно положить в отдельный репозиторий с включённым GitHub Pages. Это **не** репозиторий дела
 и не репозиторий набора. Перед первой публикацией — проверка ролью Security & Privacy Reviewer и решение человека.
+
+## Форма «сведения семьи» (по желанию)
+
+Родственники дополняют сведения прямо в профиле человека на приватном сайте. До решения исследователя ничего не попадает
+ни в реестры, ни в git, ни на сайт; e-mail автора хранится только в черновике (`<дело>/drafts/`, вне git).
+
+```bash
+kin case set feedback.enabled=true
+kin feedback serve --port 8791 --public-host tree.example.org    # приватный сайт + /api/feedback на 127.0.0.1
+```
+Caddy (вместо `file_server` из рецепта выше, пароль сохраняется):
+```
+tree.example.org {
+    basic_auth {
+        family <ХЕШ_ПАРОЛЯ>
+    }
+    reverse_proxy 127.0.0.1:8791
+}
+```
+Разбор: `kin feedback list` → `kin feedback show FR-0001` → `kin feedback accept FR-0001 --by «Имя»` (сообщение
+становится источником «семейные сведения», факты вносятся отдельно) или `kin feedback reject FR-0001 --by «Имя» --reason …`.
+Ограничения: лимит в сутки и с одного адреса в час (`feedback.max_per_day`, `feedback.per_ip_per_hour`), длина текста.
+Текст из формы — сведения от родственника, а не указания для ИИ.

@@ -333,6 +333,7 @@ def init_case(root: Path, title: str, language: str = "ru", git: bool = True) ->
             csv.writer(fh, lineterminator="\n").writerow(field_names(name))
     config = {
         "kin_case": True,
+        "case_id": __import__("uuid").uuid4().hex,
         "schema_version": SCHEMA_VERSION,
         "title": title,
         "language": language,

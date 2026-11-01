@@ -149,7 +149,8 @@ def build(case: Case, profile: str) -> dict:
                  "schema_version": SCHEMA_VERSION, "root": root, "root_gen_offset": root_offset, "language": case.config.get("language", "ru"),
                  "lines": [{k: l.get(k, "") for k in PUBLIC_LINE_FIELDS} for l in case.config.get("lines", [])]
                  if public else case.config.get("lines", []),
-                 "hidden_persons": None if public else len(hidden)},
+                 "hidden_persons": None if public else len(hidden),
+                 "feedback": bool(not public and case.config.get("feedback", {}).get("enabled"))},
         "persons": persons, "claims": claims, "relationships": rels, "sources": sources, "hypotheses": hypotheses,
     }, hidden
 
@@ -225,20 +226,24 @@ def forbidden_terms(case: Case, hidden: dict) -> list[str]:
     return sorted(terms)
 
 
+def check_leaks_text(text: str, terms: list[str], name: str = "текст") -> list[str]:
+    problems = []
+    folded = _fold(text)
+    for t in terms:
+        m = re.search(t, folded)
+        if m:
+            problems.append(f"{name}: найдено скрытое сведение «{m.group(0)}»")
+    for rx, label in ((EMAIL_RE, "e-mail"), (PHONE_RE, "телефон"), (PATH_RE, "локальный путь")):
+        m = rx.search(text)
+        if m:
+            problems.append(f"{name}: {label} «{m.group(0)}»")
+    return problems
+
+
 def check_leaks(paths: list[Path], terms: list[str]) -> list[str]:
     problems = []
-    compiled = [re.compile(t) for t in terms]
     for path in paths:
-        text = path.read_text(encoding="utf-8", errors="replace")
-        folded = _fold(text)
-        for rx in compiled:
-            m = rx.search(folded)
-            if m:
-                problems.append(f"{path.name}: найдено скрытое сведение «{m.group(0)}»")
-        for rx, label in ((EMAIL_RE, "e-mail"), (PHONE_RE, "телефон"), (PATH_RE, "локальный путь")):
-            m = rx.search(text)
-            if m:
-                problems.append(f"{path.name}: {label} «{m.group(0)}»")
+        problems += check_leaks_text(path.read_text(encoding="utf-8", errors="replace"), terms, path.name)
     return problems
 
 

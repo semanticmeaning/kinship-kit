@@ -10,7 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import __version__, audit, cli_workflow, publish, site, status, workflow
+from . import __version__, audit, cli_stage3, cli_workflow, i18n, publish, site, status, workflow
+from .i18n import t
 from .store import (REGISTERS, SCHEMA, Case, KinError, field_names, find_case_dir, init_case,
                     register_by_prefix, sha256_file, split_ids)
 
@@ -51,7 +52,7 @@ def _collect(args, mapping: dict[str, str]) -> dict:
 
 def _print_row(args, row: dict, verb: str = "добавлено") -> None:
     rid = next(iter(row.values()))
-    _out(args, row, f"{rid} {verb}")
+    _out(args, row, f"{rid} {t(verb)}")
 
 
 # ---------------------------------------------------------------- init
@@ -82,7 +83,7 @@ def cmd_init(args) -> int:
     text = CASE_AGENTS_MD.format(title=args.title or root.name, version=SCHEMA["schema_version"])
     (root / "AGENTS.md").write_text(text, encoding="utf-8")
     (root / "CLAUDE.md").write_text("@AGENTS.md\n", encoding="utf-8")
-    print(f"Дело создано: {root}\nДальше: cd {root} && kin status")
+    print(f"{t('Дело создано')}: {root}\n{t('Дальше')}: cd {root} && kin status")
     return 0
 
 
@@ -292,7 +293,7 @@ def cmd_list(args) -> int:
     for r in rows:
         st = r.get("status") or r.get("result") or r.get("link_status") or ""
         lines.append(f"{r[reg['id']]}  {('[' + st + '] ') if st else ''}{r.get(title_field, '')}")
-    _out(args, rows, "\n".join(lines) or "(пусто)")
+    _out(args, rows, "\n".join(lines) or t("(пусто)"))
     return 0
 
 
@@ -370,7 +371,19 @@ def cmd_unmerge(args) -> int:
 
 # ---------------------------------------------------------------- настройки дела
 
-CASE_KEYS = {"title": str, "language": str, "root_person": str, "privacy.living_cutoff_years": int}
+def _bool(value: str) -> bool:
+    v = value.strip().casefold()
+    if v in ("true", "yes", "да", "1", "on"):
+        return True
+    if v in ("false", "no", "нет", "0", "off"):
+        return False
+    raise ValueError(value)
+
+
+_bool.__name__ = "true/false"
+CASE_KEYS = {"title": str, "language": str, "root_person": str, "privacy.living_cutoff_years": int,
+             "feedback.enabled": _bool, "feedback.max_per_day": int, "feedback.max_chars": int,
+             "feedback.per_ip_per_hour": int}
 LINE_FIELDS = ("id", "title", "surname", "state", "where", "focus", "color")
 
 
@@ -554,6 +567,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="kin", description="kinship-kit: дело генеалогического исследования")
     ap.add_argument("--version", action="version", version=f"kin {__version__} (схема v{SCHEMA['schema_version']})")
     ap.add_argument("--case", dest="case_global", help="Папка дела (можно и после команды)")
+    ap.add_argument("--lang", choices=["ru", "en"], help="Язык интерфейса (иначе KIN_LANG или язык дела)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("init", help="Создать папку дела (приватную, отдельно от набора)")
@@ -682,6 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_site_serve)
 
     cli_workflow.add_commands(sub, _common)
+    cli_stage3.add_commands(sub, _common)
 
     p = sub.add_parser("doctor", help="Проверка окружения, размещения дела и приватности")
     _common(p)
@@ -696,14 +711,21 @@ def main(argv: list[str] | None = None) -> int:
         except (AttributeError, ValueError):
             pass
     args = build_parser().parse_args(argv)
+    case_lang = None
+    try:  # язык дела — без открытия реестров (дело может требовать миграции)
+        root = find_case_dir(getattr(args, "case", None) or args.case_global)
+        case_lang = json.loads((root / "case.json").read_text(encoding="utf-8")).get("language")
+    except (KinError, OSError, ValueError):
+        pass
+    i18n.init(args.lang, case_lang)
     try:
         return args.fn(args)
     except KinError as e:
-        print(f"Ошибка: {e}", file=sys.stderr)
+        print(f"{t('Ошибка')}: {e}", file=sys.stderr)
         return 1
     except json.JSONDecodeError as e:
         print(f"Ошибка JSON: {e}", file=sys.stderr)
         return 1
     except (ValueError, OSError) as e:
-        print(f"Ошибка: {e}", file=sys.stderr)
+        print(f"{t('Ошибка')}: {e}", file=sys.stderr)
         return 1
