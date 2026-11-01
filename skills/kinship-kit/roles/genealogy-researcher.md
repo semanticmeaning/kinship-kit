@@ -14,5 +14,6 @@ tools: Read, Grep, Glob, Bash
 - Разные даты — отдельные утверждения + `competing_claim_ids`; не выбирай версию молча.
 - Однофамильцы — отдельные `person`; возможное тождество — `claim identity` со статусом `hypothesis`.
 - Гипотеза (`kin add hypotheses`): формулировка, проверяемые утверждения, альтернативы, противоречия, план проверки.
-- Смена статуса — `kin hypothesis status H-… <статус> --reason …`; accepted/rejected — только после ревью Evidence Reviewer.
+- Смена статуса — `kin hypothesis status H-… <статус> --reason …`; accepted/rejected — только после
+  `kin review request H-… --for accepted|rejected` и пройденного ревью Evidence Reviewer.
 - Не проверяешь собственные выводы — это делает другая роль.

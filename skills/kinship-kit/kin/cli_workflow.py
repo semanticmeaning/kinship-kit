@@ -6,6 +6,7 @@ import datetime as dt
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -48,7 +49,7 @@ def _case(args) -> Case:
 
 
 def _actor(args) -> str:
-    return getattr(args, "actor", None) or os.environ.get("KIN_ACTOR") or "user"
+    return " ".join((getattr(args, "actor", None) or os.environ.get("KIN_ACTOR") or "user").split())
 
 
 def _out(args, data, text: str) -> None:
@@ -87,7 +88,7 @@ def cmd_setup(args) -> int:
     surname = args.surname or (interactive and _ask("1. Основная фамилия исследования (линия поиска)")) or ""
     if not surname:
         raise KinError("Укажите --surname (основная фамилия исследования)")
-    title = args.title or (interactive and _ask("2. Название дела", f"Род {surname}")) or f"Род {surname}"
+    title = args.title or (interactive and _ask("2. Название дела", f"{surname} — родословная")) or f"{surname} — родословная"
     default_dir = str(Path.home() / "kinship-cases" / slug(surname))
     case_dir = args.dir or (interactive and _ask("3. Папка дела (приватная, вне репозитория набора)", default_dir)) or default_dir
     name, email = args.author_name, args.author_email
@@ -255,6 +256,12 @@ def cmd_search_add(args) -> int:
     values.setdefault("date", dt.date.today().isoformat())
     with case.lock():
         workflow.guard_search(case, values)
+        if values.get("task_id") and not values.get("new_basis"):
+            _, task = case.get(values["task_id"])
+            limit = int(workflow.limits(case)["max_attempts_per_task"])
+            if len(split_ids(task.get("search_ids"))) >= limit:
+                raise KinError(f"{values['task_id']}: исчерпан лимит попыток ({limit}). Новая попытка — только с "
+                               "--new-basis «…» или пересмотр задачи (kin task new …)")
         row = case.add("searches", values, _actor(args))
         if values.get("task_id"):
             case.update(values["task_id"], {}, _actor(args), append={"search_ids": row["search_id"]})
@@ -280,7 +287,8 @@ def cmd_review(args) -> int:
         _out(args, items, "\n".join(f"[{i['level']}] {i['text']}" for i in items) or "Автоматических замечаний нет.")
         return 0
     if args.action == "request":
-        row = workflow.request_review(case, args.id, args.reviewer or "Evidence Reviewer", _actor(args))
+        row = workflow.request_review(case, args.id, args.reviewer or "Evidence Reviewer", _actor(args),
+                                      workflow.decision_key(case, args.id, args.decision or ""))
         _out(args, row, f"{row['review_id']} запрошено для {args.id}. Исполнители: {row['authors'] or '—'}.\n"
                         f"Замечания чек-листа: {row['auto_findings'] or 'нет'}\n"
                         f"Проверяет другая роль: kin review submit {row['review_id']} --as \"Evidence Reviewer\" …")
@@ -385,35 +393,48 @@ def cmd_site_publish(args) -> int:
     if args.profile == "private" and not args.password_protected:
         raise KinError("Приватная сборка содержит живых: выкладывайте только за паролем и подтвердите --password-protected "
                        "(рецепт Caddy + basic_auth — docs/deploy.md).")
-    if case.root == target or case.root in target.parents:
-        if target != case.root / "site" / args.profile:
-            raise KinError("Папка выкладки внутри папки дела — укажите внешнюю папку веб-сервера")
+    forbidden = {Path("/"), Path.home().resolve(), SKILL_DIR.parent.parent.resolve()}
+    if target in forbidden or target == case.root or case.root in target.parents or target in case.root.parents:
+        raise KinError(f"{target}: нельзя выкладывать в корень диска, домашнюю папку, папку дела или набора и их родителей — "
+                       "укажите отдельную папку веб-сервера")
+    manifest_path = target / MANIFEST
+    previous: list[str] = []
+    if target.exists() and any(target.iterdir()):
+        if not manifest_path.is_file():
+            raise KinError(f"{target} не пуста и не создана kin site publish (нет {MANIFEST}) — укажите пустую папку")
+        try:
+            previous = json.loads(manifest_path.read_text(encoding="utf-8"))["files"]
+        except (ValueError, KeyError):
+            raise KinError(f"{manifest_path}: повреждён — разберитесь вручную") from None
     res = audit.run(case)
     if res["errors"]:
         raise KinError(f"Публикация остановлена: ошибок аудита {len(res['errors'])} (kin audit)")
     out = site.build(case, args.profile)
-    files = sorted(p for p in out.rglob("*") if p.is_file())
+    files = sorted(p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file())
     if args.dry_run:
-        print(f"Проверка пройдена. Будет скопировано в {target}:\n" + "\n".join(f"- {p.relative_to(out)}" for p in files))
+        print(f"Проверка пройдена. Будет скопировано в {target}:\n" + "\n".join(f"- {f}" for f in files))
         return 0
     target.mkdir(parents=True, exist_ok=True)
-    for old in target.iterdir():  # синхронизация: удалённое из сборки удаляется и с сайта
-        if old.name not in {p.relative_to(out).parts[0] for p in files}:
-            shutil.rmtree(old) if old.is_dir() else old.unlink()
-    for p in files:
-        dest = target / p.relative_to(out)
+    for rel in set(previous) - set(files):  # удаляем только то, что сами выложили раньше
+        old = (target / rel).resolve()
+        if target in old.parents and old.is_file():
+            old.unlink()
+    for rel in files:
+        dest = target / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(p, dest)
+        shutil.copy2(out / rel, dest)
+    manifest_path.write_text(json.dumps({"profile": args.profile, "files": files}, ensure_ascii=False, indent=1),
+                             encoding="utf-8")
     case.journal(_actor(args), "publish", args.profile, {"to": str(target), "files": len(files)})
     print(f"Опубликовано ({args.profile}): {len(files)} файлов → {target}")
     return 0
 
 
-HOOK = """#!/bin/sh
-# kinship-kit: после коммита пересобрать сайт дела{publish_note}. Журнал: .kin/hook.log
-cd "$(git rev-parse --show-toplevel)" || exit 0
-{{ date; {cmd}; }} >> .kin/hook.log 2>&1 || echo "kin: сборка сайта не прошла — см. .kin/hook.log" >&2
-"""
+MANIFEST = ".kin-publish.json"
+
+
+
+HOOK_MARK = "# kinship-kit post-commit"
 
 
 def cmd_hooks_install(args) -> int:
@@ -421,15 +442,23 @@ def cmd_hooks_install(args) -> int:
     git_dir = case.root / ".git"
     if not git_dir.is_dir():
         raise KinError("Дело не под git: git init в папке дела")
-    kin = f'python3 "{SKILL_DIR / "kin.py"}"'
+    hook = git_dir / "hooks" / "post-commit"
+    if hook.exists() and HOOK_MARK not in hook.read_text(encoding="utf-8", errors="replace") and not args.force:
+        raise KinError(f"{hook} уже есть и создан не kin — не перезаписываю (--force, если уверены)")
+    kin = f"python3 {shlex.quote(str(SKILL_DIR / 'kin.py'))}"
     if args.publish_to:
-        cmd = f'{kin} site publish --profile {args.profile} --to "{args.publish_to}"' + (" --password-protected" if args.profile == "private" else "")
-        note = f" и выложить в {args.publish_to}"
+        if args.profile == "private" and not args.password_protected:
+            raise KinError("Автовыкладка приватной сборки (с живыми) — только за паролем: подтвердите --password-protected")
+        cmd = (f"{kin} site publish --profile {args.profile} --to {shlex.quote(str(Path(args.publish_to).expanduser().resolve()))}"
+               + (" --password-protected" if args.profile == "private" else ""))
+        note = f" и выложить ({args.profile})"
     else:
         cmd, note = f"{kin} site build --profile {args.profile}", ""
-    hook = git_dir / "hooks" / "post-commit"
     hook.parent.mkdir(exist_ok=True)
-    hook.write_text(HOOK.format(cmd=cmd, publish_note=note), encoding="utf-8")
+    hook.write_text(f"#!/bin/sh\n{HOOK_MARK}: пересобрать сайт дела{note}. Журнал: .kin/hook.log\n"
+                    'cd "$(git rev-parse --show-toplevel)" || exit 0\n'
+                    f"{{ date; {cmd}; }} >> .kin/hook.log 2>&1 || echo \"kin: сборка сайта не прошла — см. .kin/hook.log\" >&2\n",
+                    encoding="utf-8")
     hook.chmod(0o755)
     print(f"✓ {hook.relative_to(case.root)}: {cmd}")
     return 0
@@ -526,6 +555,8 @@ def add_commands(sub, common) -> None:
         p = g.add_parser(action)
         p.add_argument("id")
         p.add_argument("--reviewer")
+        p.add_argument("--for", dest="decision", choices=["accepted", "rejected", "strongly-corroborated", "merge"],
+                       help="Какое решение проверяется (обязательно, чтобы ревью разрешило это решение)")
         p.add_argument("--verdict", choices=["passed", "failed", "needs-work"])
         p.add_argument("--findings")
         p.add_argument("--checked", help="Прочитанные первичные источники A-…;A-…")
@@ -573,6 +604,8 @@ def add_commands(sub, common) -> None:
     p = g.add_parser("install", help="post-commit: пересобрать сайт (и выложить, если --publish-to)")
     p.add_argument("--profile", default="private", choices=["private", "public"])
     p.add_argument("--publish-to")
+    p.add_argument("--password-protected", action="store_true", help="Подтверждение: приватная выкладка только за паролем")
+    p.add_argument("--force", action="store_true", help="Перезаписать чужой post-commit")
     common(p)
     p.set_defaults(fn=cmd_hooks_install)
 

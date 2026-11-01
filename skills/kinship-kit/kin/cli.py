@@ -29,7 +29,7 @@ def _case(args) -> Case:
 
 
 def _actor(args) -> str:
-    return args.actor or os.environ.get("KIN_ACTOR") or "user"
+    return " ".join((args.actor or os.environ.get("KIN_ACTOR") or "user").split())
 
 
 def _pairs(items: list[str] | None) -> dict:
@@ -186,6 +186,15 @@ def cmd_add(args) -> int:
     values = json.loads(args.json_data) if args.json_data else {}
     values.update(_pairs(args.set))
     _guard_merge(args.register, values)
+    if args.register == "reviews":
+        raise KinError("Ревью создаются командой kin review request")
+    if args.register == "tasks":
+        if values.get("user_consent"):
+            raise KinError("Согласие пользователя — только командой kin task consent T-… --granted|--denied --by «Имя»")
+        if values.get("status", "planned") not in ("planned", "ready", "blocked"):
+            raise KinError("Новая задача — planned, ready или blocked; дальше — команды kin task …")
+        if values.get("search_ids"):
+            raise KinError("Попытки задачи пишутся командой kin search add --task …")
     if args.register == "searches":
         with case.lock():
             workflow.guard_search(case, values)
@@ -206,22 +215,41 @@ def _guard_merge(register: str, values: dict) -> None:
         raise KinError("Слияние людей — только командой kin person merge (нужно основание тождества).")
 
 
+TASK_LOCKED = {"status": "kin task start|ready|block|review|done|close", "user_consent": "kin task consent … --by «Имя»",
+               "search_ids": "kin search add --task …"}
+LOWERING = {"cost": ("paid", "unknown"), "external_service": ("yes",)}
+
+
 def cmd_update(args) -> int:
     case = _case(args)
     changes = _pairs(args.pairs)
     append = _pairs(args.append)
     register = register_by_prefix(args.id)
-    _guard_merge(register, {**changes, **append})
-    if register == "hypotheses" and "status" in changes:
+    touched = {**changes, **append}  # проверки видят и --append
+    _guard_merge(register, touched)
+    if register == "reviews":
+        raise KinError("Ревью меняются только командами kin review submit/decide (засчитывается запись в журнале).")
+    if register == "hypotheses" and "status" in touched:
         raise KinError("Статус гипотезы — командой kin hypothesis status H-… <статус> --reason «…» (история решений, ревью)")
-    if register == "claims" and changes.get("status") == "strongly-corroborated" \
+    if register == "tasks":
+        for field, command in TASK_LOCKED.items():
+            if field in touched:
+                raise KinError(f"{field} задачи меняется командой {command}")
+        _, row = case.get(args.id)
+        for field, guarded in LOWERING.items():
+            if field in touched and row.get(field) in guarded and touched[field] not in guarded:
+                raise KinError(f"Снять {field}={row[field]} может только человек: задача остаётся под согласием "
+                               f"(kin task consent {args.id} --granted --by «Имя»)")
+    op = "update"
+    if register == "claims" and touched.get("status") == "strongly-corroborated" \
             and workflow.requires_review(case, "claim:strongly-corroborated"):
-        ok, why = workflow.review_ok(case, args.id)
+        if set(touched) - {"status"}:
+            raise KinError("Решение strongly-corroborated — отдельной командой: только status=strongly-corroborated")
+        ok, why = workflow.review_ok(case, args.id, "claim:strongly-corroborated")
         if not ok:
             raise KinError(f"{args.id} → strongly-corroborated: {why}")
-    if register == "tasks" and "user_consent" in changes:
-        raise KinError("Согласие пользователя — командой kin task consent T-… --granted|--denied --by «Имя»")
-    row = case.update(args.id, changes, _actor(args), append=append)
+        op = "status-decision"
+    row = case.update(args.id, changes, _actor(args), append=append, op=op)
     _print_row(args, row, "обновлено")
     return 0
 
@@ -306,19 +334,23 @@ def cmd_merge(args) -> int:
             basis = c["claim_id"]
     if not basis and not args.force:
         raise KinError(f"Нет основания слить {dup} и {into}: нужно утверждение identity с обоими ID в статусе corroborated "
-                       "(две независимые группы источников). Пока — отметьте возможное тождество "
+                       "(две независимые группы источников) и пройденное ревью. Пока — отметьте возможное тождество "
                        "(claim identity со статусом hypothesis) и держите записи раздельно. "
-                       "Осознанно вопреки правилу — --force --reason «…».")
-    if basis and not args.force and workflow.requires_review(case, "merge"):
-        ok, why = workflow.review_ok(case, basis)
+                       "Осознанно вопреки правилу решает только человек: --force --by «Имя» --reason «…».")
+    by = " ".join((args.by or "").split())
+    if args.force:
+        if workflow.norm_actor(by) in ("", "user") or not args.reason:
+            raise KinError("--force — решение человека: укажите --by «Имя» и --reason «…»")
+    elif workflow.requires_review(case, "merge"):
+        ok, why = workflow.review_ok(case, basis, "merge")
         if not ok:
-            raise KinError(f"Слияние по {basis} требует независимого ревью этого утверждения: {why}")
-    reason = args.reason or (f"Тождество подтверждено {basis}" if basis else "")
-    if not reason:
-        raise KinError("--force требует --reason")
+            raise KinError(f"Слияние по {basis} требует независимого ревью: {why}")
+    reason = args.reason or f"Тождество подтверждено {basis}"
     case.update(dup, {"status": "duplicate", "merged_into": into,
-                      "merge_rationale": f"Дубликат {into}: {reason}" + (" [принудительно]" if not basis else "")},
-                _actor(args))
+                      "merge_rationale": f"Дубликат {into}: {reason}" + (f" [принудительно: {by}]" if args.force else "")},
+                by if args.force else _actor(args), op="status-decision" if not args.force else "update")
+    if args.force:
+        case.journal(by, "human-decision", dup, {"action": "merge-force", "person": dup, "into": into, "reason": reason})
     print(f"{dup} слит в {into}. Упоминания, утверждения и связи {dup} сохранены и читаются как {into}. "
           f"Отменить: kin person unmerge {dup} --reason «…»")
     return 0
@@ -547,7 +579,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("duplicate")
     p.add_argument("into")
     p.add_argument("--reason")
-    p.add_argument("--force", action="store_true")
+    p.add_argument("--force", action="store_true", help="Вопреки правилу — только решение человека (--by)")
+    p.add_argument("--by", help="Имя человека, принимающего решение при --force")
     _common(p)
     p.set_defaults(fn=cmd_merge)
     p = per.add_parser("unmerge", help="Отменить слияние")

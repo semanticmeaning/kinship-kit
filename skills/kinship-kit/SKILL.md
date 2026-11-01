@@ -58,7 +58,7 @@ python3 <папка этого навыка>/kin.py <команда>      # да
 | Следующее действие | `kin next` — ранжирование с причинами; недоступное (платно без согласия, лимит попыток) — отдельно |
 | Поиск (и пустой) | `kin search add --task T-… --source … --query … --variants … --period 1880/1890 --result not-found --limits … --allowed … --disallowed … --repeat-when …`; проверить до поиска — `kin search check --source … --query …` |
 | Решение по гипотезе | `kin hypothesis status H-… supported|weakened|parked|rejected|accepted --reason "…" [--reopen "…"]` |
-| Независимое ревью | `kin review request <ID>` → другая роль: `kin review checklist <ID>`, `kin review submit V-… --verdict … --checked A-… --findings …` → при необходимости человек: `kin review decide V-… --by «Имя»` |
+| Независимое ревью | `kin review request <ID> --for accepted|rejected|strongly-corroborated|merge` → другая роль: `kin review checklist <ID>`, `kin review submit V-… --verdict … --checked A-… --findings …` → при необходимости человек: `kin review decide V-… --by «Имя»` |
 | Запросы в архивы | `kin request add --recipient … --subject … --channel gov-portal --text requests/….md`, `kin request sent Q-… --date … --number …`, `kin request answer Q-… --artifacts A-…` |
 | История решений | `kin history <ID>` |
 | Изменить запись | `kin update C-0003 status=corroborated rationale="…"`, добавить ID в список: `--append artifact_ids=A-0009` |
@@ -100,7 +100,7 @@ python3 <папка этого навыка>/kin.py <команда>      # да
    Повтор безрезультатного поиска `kin` отклонит без `--new-basis`.
 4. Обновить утверждения, связи и гипотезу (источники «за» и «против», противоречия); решение по гипотезе — `kin hypothesis status … --reason`.
 5. Завершить задачу: `kin task done T-… --reason … --evidence A-…` или `kin task close T-… --reason …`; новую — `kin task new …`.
-6. Значимый вывод (принять/опровергнуть гипотезу, strongly-corroborated, слияние) — `kin review request`; проверяет
+6. Значимый вывод (принять/опровергнуть гипотезу, strongly-corroborated, слияние) — `kin review request <ID> --for <решение>`; проверяет
    **другая роль** (Evidence Reviewer) по первичным источникам; правила — `docs/REVIEW.md` репозитория набора.
 7. `kin audit` — 0 ошибок. Коммит в git-репозитории дела (короткое сообщение).
 8. Повторять, пока `kin next` предлагает доступные шаги в пределах ограничений дела (`case.json` → `limits`).

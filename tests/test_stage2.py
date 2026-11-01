@@ -32,6 +32,8 @@ class TestMigration(Base):
             row = {k: "" for k in tasks}
             row.update(task_id="T-0001", goal="Старая задача, v1", status="ready", priority="1")
             csv.DictWriter(fh, tasks, lineterminator="\n").writerow(row)
+            row.update(task_id="T-0002", goal="Платный запрос", constraints="Платный запрос — нужно согласие", priority="")
+            csv.DictWriter(fh, tasks, lineterminator="\n").writerow(row)
         cfg = json.loads((self.case / "case.json").read_text(encoding="utf-8"))
         cfg["schema_version"] = 1
         (self.case / "case.json").write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
@@ -47,6 +49,7 @@ class TestMigration(Base):
         t = case.index("tasks")["T-0001"]
         self.assertEqual((t["goal"], t["priority"], t["cost"]), ("Старая задача, v1", "1", ""))
         self.assertEqual(case.rows("reviews"), [])
+        self.assertEqual(case.index("tasks")["T-0002"]["cost"], "paid")  # платность из текста v1 сохранена
         self.assertTrue(list((self.case / ".kin").glob("backup-v1-*/registry/tasks.csv")))
         self.assertEqual(json.loads(self.kin("audit", "--json").stdout)["errors"], [])
         self.assertIn("актуальна", self.kin("migrate").stdout)
@@ -72,6 +75,13 @@ class TestTasksAndNext(Base):
         self.assertIn("T-0003", excluded)
         self.assertIn("согласие", self.kin("task", "start", "T-0003", ok=False).stderr)
         self.assertNotEqual(self.kin("update", "T-0003", "user_consent=granted", ok=False).returncode, 0)
+        self.assertNotEqual(self.kin("update", "T-0003", "--append", "user_consent=granted", ok=False).returncode, 0)
+        self.assertNotEqual(self.kin("add", "tasks", "--set", "goal=x", "--set", "status=ready",
+                                     "--set", "user_consent=granted", ok=False).returncode, 0)
+        for args in (("update", "T-0003", "cost=free"), ("update", "T-0003", "status=in-progress"),
+                     ("update", "T-0003", "search_ids="),
+                     ("add", "tasks", "--set", "goal=x", "--set", "cost=paid", "--set", "status=in-progress")):
+            self.assertNotEqual(self.kin(*args, ok=False).returncode, 0, args)
         self.kin("task", "consent", "T-0003", "--granted", "--by", "Тестовый Пользователь")
         self.kin("task", "start", "T-0003", "--as", "Archive Researcher")
         self.assertEqual(Case(self.case).index("tasks")["T-0003"]["assignee"], "Archive Researcher")
@@ -99,6 +109,9 @@ class TestTasksAndNext(Base):
                      "--result", "not-found", "--disallowed", "—")
         nxt = json.loads(self.kin("next", "--json").stdout)
         self.assertIn("лимит попыток", nxt["excluded"][0]["reason"])
+        res = self.kin("search", "add", "--task", "T-0001", "--source", "Ещё одна библиотека", "--query", "другое",
+                       "--result", "not-found", ok=False)
+        self.assertIn("лимит", res.stderr)
 
 
 class TestSearchRepeat(Base):
@@ -115,6 +128,14 @@ class TestSearchRepeat(Base):
         self.kin("search", "add", "--source", "ГАОО ф. 15 оп. 2 метрики", "--query", "рождение Ивана сына Кузьмы",
                  "--period", "1855", "--result", "not-found", "--new-basis", "найден вариант написания Ветлюгин",
                  "--disallowed", "—")
+        # другое дело (номера) и другие люди — не повтор
+        self.kin("search", "add", "--source", "ГАОО ф. 20 оп. 1 метрики", "--query", "рождение Ивана сына Кузьмы",
+                 "--period", "1855", "--result", "not-found", "--disallowed", "—")
+        p1, p2 = self.person("Ветлугин Иван Петрович"), self.person("Ветлугин Иван Кузьмич")
+        self.kin("search", "add", "--source", "Книга памяти", "--query", "Ветлугин Иван", "--persons", p1,
+                 "--result", "not-found", "--disallowed", "—")
+        self.kin("search", "add", "--source", "Книга памяти", "--query", "Ветлугин Иван", "--persons", p2,
+                 "--result", "not-found", "--disallowed", "—")
         # другой период — не повтор
         self.kin("search", "add", "--source", "ГАОО ф. 15 оп. 2 метрики", "--query", "рождение Ивана сына Кузьмы",
                  "--period", "1880/1885", "--result", "not-found", "--disallowed", "—")
@@ -141,16 +162,16 @@ class TestReview(Base):
                  "--as", "Evidence Reviewer")
         self.assertEqual(Case(self.case).index("reviews")["V-0001"]["status"], "needs-work")
         res = self.kin("hypothesis", "status", "H-0001", "accepted", "--reason", "уверены", ok=False)
-        self.assertIn("ревью", res.stderr)
+        self.assertIn("блокирующие", res.stderr)
 
     def test_self_review_and_unread_sources_refused(self):
         self.kin("claim", "add", "--type", "parentage", "--subject", self.p, "--statement", "x",
                  "--sources", f"{self.a1};{self.a2}", "--status", "corroborated", "--rationale", "две группы",
                  "--as", "Genealogy Researcher")
-        self.kin("review", "request", "C-0001")
-        res = self.kin("review", "submit", "V-0001", "--verdict", "passed", "--checked", self.a1,
-                       "--as", "Genealogy Researcher", ok=False)
-        self.assertIn("другой ролью", res.stderr)
+        self.kin("review", "request", "C-0001", "--for", "strongly-corroborated")
+        for actor in ("Genealogy Researcher", "genealogy  researcher "):  # и с лишними пробелами
+            res = self.kin("review", "submit", "V-0001", "--verdict", "passed", "--checked", self.a1, "--as", actor, ok=False)
+            self.assertIn("другой ролью", res.stderr)
         res = self.kin("review", "submit", "V-0001", "--verdict", "passed", "--as", "Evidence Reviewer", ok=False)
         self.assertIn("первичные источники", res.stderr)
         other = self.add_source("other", group="g3")
@@ -160,9 +181,39 @@ class TestReview(Base):
         self.kin("review", "submit", "V-0001", "--verdict", "passed", "--checked", f"{self.a1};{self.a2}",
                  "--findings", "ok", "--as", "Evidence Reviewer")
         self.kin("update", "C-0001", "status=strongly-corroborated")  # теперь разрешено
+        self.assertEqual(json.loads(self.kin("audit", "--json").stdout)["errors"], [])  # и аудит согласен
         # изменение после ревью снимает его силу
         self.kin("update", "C-0001", "status=corroborated")
+        self.kin("update", "C-0001", "rationale=пересмотрено")
         res = self.kin("update", "C-0001", "status=strongly-corroborated", ok=False)
+        self.assertIn("ревью", res.stderr)
+
+    def test_review_cannot_be_faked_or_reused(self):
+        self.kin("claim", "add", "--type", "parentage", "--subject", self.p, "--statement", "x",
+                 "--sources", f"{self.a1};{self.a2}", "--status", "corroborated", "--rationale", "две группы")
+        self.kin("review", "request", "C-0001")  # общее ревью, без решения
+        for args in (("update", "V-0001", "status=passed"), ("update", "V-0001", "human_decision=ok"),
+                     ("add", "reviews", "--set", "target_id=C-0001", "--set", "status=passed")):
+            self.assertNotEqual(self.kin(*args, ok=False).returncode, 0, args)
+        self.kin("review", "submit", "V-0001", "--verdict", "passed", "--checked", self.a1, "--findings", "ok",
+                 "--as", "Evidence Reviewer")
+        # общее ревью не разрешает конкретное решение
+        self.assertIn("ревью", self.kin("update", "C-0001", "status=strongly-corroborated", ok=False).stderr)
+        # подделка строки в CSV — ловит аудит
+        reg = self.case / "registry" / "reviews.csv"
+        reg.write_text(reg.read_text(encoding="utf-8").replace("passed", "needs-work"), encoding="utf-8")
+        self.assertTrue(any("журнал" in e for e in json.loads(self.kin("audit", "--json", ok=False).stdout)["errors"]))
+
+    def test_stale_review_after_linked_claim_changes(self):
+        self.kin("claim", "add", "--type", "parentage", "--subject", self.p, "--statement", "x",
+                 "--sources", f"{self.a1};{self.a2}", "--status", "single-source", "--as", "Genealogy Researcher")
+        self.kin("update", "H-0001", "claim_ids=C-0001", f"supporting_artifact_ids={self.a1};{self.a2}",
+                 "alternatives=однофамилец", "test_plan=метрики", "--as", "Genealogy Researcher")
+        self.kin("review", "request", "H-0001", "--for", "accepted", "--as", "Genealogy Researcher")
+        self.kin("review", "submit", "V-0001", "--verdict", "passed", "--checked", self.a1, "--findings", "ok",
+                 "--as", "Evidence Reviewer")
+        self.kin("update", "C-0001", "rationale=пересмотрено после ревью", "--as", "Genealogy Researcher")  # связанное изменилось
+        res = self.kin("hypothesis", "status", "H-0001", "accepted", "--reason", "ok", ok=False)
         self.assertIn("ревью", res.stderr)
 
     def test_hypothesis_lifecycle_rules(self):
@@ -216,20 +267,44 @@ class TestRequestsAgentsPublish(Base):
         p = self.person("Ветлугин Сергей", "deceased", "identity-confirmed", "--birth", "1921")
         self.person("Ветлугина Анна", "living", "identity-confirmed", "--birth", "1952")
         target = Path(self.tmp.name) / "www"
-        target.mkdir()
-        (target / "old.html").write_text("старое", encoding="utf-8")
         self.assertIn("паролем", self.kin("site", "publish", "--profile", "private", "--to", str(target), ok=False).stderr)
         self.kin("site", "publish", "--profile", "public", "--to", str(target))
         text = (target / "tree.json").read_text(encoding="utf-8")
         self.assertIn(p, text)
         self.assertNotIn("Анна", text)
-        self.assertFalse((target / "old.html").exists())
+        # повторная выкладка удаляет только своё устаревшее, чужое не трогает
+        (target / "robots.txt").unlink()
+        (target / "extra.html").write_text("чужой файл", encoding="utf-8")
+        self.kin("site", "publish", "--profile", "public", "--to", str(target))
+        self.assertTrue((target / "extra.html").exists() and (target / "robots.txt").exists())
+
+    def test_publish_refuses_dangerous_targets(self):
+        foreign = Path(self.tmp.name) / "foreign"
+        foreign.mkdir()
+        (foreign / "important.txt").write_text("не удалять", encoding="utf-8")
+        for bad in (str(foreign), str(Path(self.tmp.name)), str(self.case), "/"):
+            self.assertNotEqual(self.kin("site", "publish", "--to", bad, ok=False).returncode, 0, bad)
+        self.assertTrue((foreign / "important.txt").exists())
 
     def test_hook_install(self):
         subprocess.run(["git", "init", "-q", str(self.case)], check=True)
         self.kin("hooks", "install")
         hook = (self.case / ".git" / "hooks" / "post-commit").read_text(encoding="utf-8")
         self.assertIn("site build --profile private", hook)
+        evil = str(Path(self.tmp.name) / "pub$(touch PWNED)")
+        self.assertIn("паролем", self.kin("hooks", "install", "--publish-to", evil, ok=False).stderr)
+        self.kin("hooks", "install", "--publish-to", evil, "--profile", "public")
+        hook = (self.case / ".git" / "hooks" / "post-commit").read_text(encoding="utf-8")
+        self.assertIn("'", hook)  # путь в одинарных кавычках shlex — без подстановки команд
+        self.assertNotIn('"' + evil, hook)
+        (self.case / ".git" / "hooks" / "post-commit").write_text("#!/bin/sh\necho мой хук\n", encoding="utf-8")
+        self.assertNotEqual(self.kin("hooks", "install", ok=False).returncode, 0)
+
+    def test_force_merge_needs_human(self):
+        p1, p2 = self.person("Иван А"), self.person("Иван Б")
+        self.assertIn("--by", self.kin("person", "merge", p2, p1, "--force", "--reason", "думаю", ok=False).stderr)
+        self.kin("person", "merge", p2, p1, "--force", "--reason", "сверено с семьёй", "--by", "Тестовый Пользователь")
+        self.assertEqual(json.loads(self.kin("audit", "--json").stdout)["errors"], [])
 
 
 class TestSetup(unittest.TestCase):
@@ -250,6 +325,17 @@ class TestSetup(unittest.TestCase):
             self.assertTrue((case / ".codex" / "agents" / "kin-orchestrator.toml").is_file())
             log = subprocess.run(["git", "-C", str(case), "log", "--format=%an"], capture_output=True, text=True).stdout
             self.assertEqual(log.strip(), "Исследователь")
+
+    def test_setup_refuses_non_empty_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {**os.environ, "HOME": tmp, "KIN_DENYLIST": str(Path(tmp) / "deny.txt")}
+            d = Path(tmp) / "docs"
+            d.mkdir()
+            (d / "mine.txt").write_text("личное", encoding="utf-8")
+            res = subprocess.run([sys.executable, str(KIN), "setup", "--yes", "--surname", "Ветлугин", "--dir", str(d),
+                                  "--anonymous-author"], capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL)
+            self.assertNotEqual(res.returncode, 0)
+            self.assertFalse((d / ".git").exists())
 
     def test_setup_requires_explicit_author(self):
         with tempfile.TemporaryDirectory() as tmp:

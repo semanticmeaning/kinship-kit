@@ -278,11 +278,15 @@ class Case:
             self.journal(actor, "add", rid, {k: v for k, v in row.items() if v and k != reg["id"]})
         return row
 
-    def update(self, identifier: str, changes: dict, actor: str = "user", append: dict | None = None) -> dict:
+    def update(self, identifier: str, changes: dict, actor: str = "user", append: dict | None = None,
+               op: str = "update") -> dict:
         """Изменить поля; append — добавить ID в списки (читается и пишется под одной блокировкой)."""
         register = register_by_prefix(identifier)
         changes = self._clean(register, changes)
         append = self._clean(register, append or {})
+        list_fields = {f["name"] for f in REGISTERS[register]["fields"] if f.get("type") in ("refs", "list")}
+        if set(append) - list_fields:
+            raise KinError(f"--append только для списков: {', '.join(sorted(list_fields))}")
         id_field = REGISTERS[register]["id"]
         if id_field in changes:
             raise KinError("ID не меняется. Для исправления отождествления — merge/split.")
@@ -302,7 +306,7 @@ class Case:
                     if errors:
                         raise KinError("Изменение не сохранено:\n- " + "\n- ".join(errors))
                     self._write(register, rows)
-                    self.journal(actor, "update", identifier, {"before": before, "after": changes})
+                    self.journal(actor, op, identifier, {"before": before, "after": changes})
                     return row
         raise KinError(f"{identifier} не найден")
 
@@ -311,6 +315,8 @@ def init_case(root: Path, title: str, language: str = "ru", git: bool = True) ->
     root = Path(root).expanduser().resolve()
     if (root / CASE_FILE).exists():
         raise KinError(f"{root}: дело уже создано")
+    if root.exists() and any(root.iterdir()):
+        raise KinError(f"{root}: папка не пуста — дело создаётся в новой или пустой папке (чужие файлы не попадут в историю дела)")
     kit_root = HERE.parent.parent.parent  # корень репозитория набора (если запущено из него)
     with contextlib.suppress(ValueError):
         root.relative_to(HERE.parent)

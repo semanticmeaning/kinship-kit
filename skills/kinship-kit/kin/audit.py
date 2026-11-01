@@ -186,17 +186,45 @@ def run(case: Case) -> dict:
     from . import workflow  # локальный импорт: workflow сам использует аудит
     for h in case.rows("hypotheses"):
         if h["status"] in ("accepted", "rejected") and workflow.requires_review(case, f"hypothesis:{h['status']}"):
-            ok, why = workflow.review_ok(case, h["hypothesis_id"])
+            ok, why = workflow.review_ok(case, h["hypothesis_id"], f"hypothesis:{h['status']}")
             if not ok:
-                errors.append(f"{h['hypothesis_id']}: {h['status']} без независимого ревью — {why}")
+                errors.append(f"{h['hypothesis_id']}: {h['status']} без действующего независимого ревью — {why}")
     for cid, c in claims.items():
         if c["status"] == "strongly-corroborated" and workflow.requires_review(case, "claim:strongly-corroborated"):
-            ok, why = workflow.review_ok(case, cid)
+            ok, why = workflow.review_ok(case, cid, "claim:strongly-corroborated")
             if not ok:
-                errors.append(f"{cid}: strongly-corroborated без независимого ревью — {why}")
+                errors.append(f"{cid}: strongly-corroborated без действующего независимого ревью — {why}")
+    if workflow.requires_review(case, "merge"):
+        entries = workflow.journal(case)
+        forced = {j.get("data", {}).get("person") for j in entries
+                  if j.get("op") == "human-decision" and j.get("data", {}).get("action") == "merge-force"}
+        for pid, p in persons.items():
+            if not p.get("merged_into") or pid in forced:
+                continue
+            basis = [c["claim_id"] for c in claims.values() if c["claim_type"] == "identity"
+                     and {pid, p["merged_into"]} <= set(split_ids(c["subject_person_ids"]))]
+            if not any(workflow.review_ok(case, b, "merge")[0] for b in basis):
+                errors.append(f"{pid}: слит в {p['merged_into']} без ревью identity-утверждения и без решения человека")
+    review_log, rejected_by_human = {}, set()
+    for j in workflow.journal(case):
+        d = j.get("data", {})
+        if j.get("op") == "review":
+            review_log[d.get("review")] = j
+        if j.get("op") == "human-decision" and d.get("review") and not d.get("accept"):
+            rejected_by_human.add(d.get("review"))
     for r in case.rows("reviews"):
+        j = review_log.get(r["review_id"])
+        if r["status"] == "requested":
+            if j:
+                errors.append(f"{r['review_id']}: в журнале есть вердикт, а строка снова «requested» (правка в обход kin review?)")
+            continue
+        verdict = j.get("data", {}).get("verdict") if j else None
+        expected = "failed" if verdict == "passed" and r["review_id"] in rejected_by_human else verdict
+        if not j or r["status"] != expected or j.get("id") != r["target_id"] \
+                or j.get("data", {}).get("decision", "") != r.get("decision", ""):
+            errors.append(f"{r['review_id']}: строка ревью не совпадает с записью в журнале (правка в обход kin review?)")
         if r["status"] in ("passed", "failed", "needs-work"):
-            if r.get("reviewer", "").casefold() in {a.casefold() for a in split_ids(r.get("authors"))}:
+            if workflow.norm_actor(r.get("reviewer", "")) in {workflow.norm_actor(a) for a in split_ids(r.get("authors"))}:
                 errors.append(f"{r['review_id']}: проверяющий совпадает с исполнителем ({r['reviewer']})")
             if r["status"] == "passed" and not split_ids(r.get("checked_artifact_ids")):
                 warnings.append(f"{r['review_id']}: пройдено без проверки первичных источников")

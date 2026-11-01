@@ -53,10 +53,29 @@ def history(case: Case, identifier: str) -> list[dict]:
             and j.get("op") in ("decision", "review")]
 
 
+def norm_actor(name: str) -> str:
+    return " ".join((name or "").split()).casefold()
+
+
 def authors(case: Case, identifier: str) -> set[str]:
-    """Кто создавал и менял запись (по журналу)."""
-    return {j.get("actor", "") for j in journal(case)
-            if j.get("id") == identifier and j.get("op") in ("add", "update", "decision")}
+    """Кто создавал и менял запись (по журналу), в нормализованном виде."""
+    return {norm_actor(j.get("actor", "")) for j in journal(case)
+            if j.get("id") == identifier and j.get("op") in ("add", "update", "decision", "status-decision")}
+
+
+DECISIONS = {"hypotheses": ("accepted", "rejected"), "claims": ("strongly-corroborated", "merge")}
+
+
+def decision_key(case: Case, target: str, short: str) -> str:
+    """«accepted» для H- → «hypothesis:accepted»; «merge» для C- → «merge»."""
+    if not short:
+        return ""
+    register, _ = case.get(target)
+    if short not in DECISIONS.get(register, ()):
+        raise KinError(f"Для {target} проверяемое решение: {', '.join(DECISIONS.get(register, ())) or 'нет'}")
+    if short == "merge":
+        return "merge"
+    return {"hypotheses": "hypothesis", "claims": "claim"}[register] + ":" + short
 
 
 def decision(case: Case, actor: str, identifier: str, data: dict) -> None:
@@ -114,11 +133,14 @@ def possibly_living(case: Case, person_id: str) -> bool:
     return not publish.person_visible({**p, "publication": ""}, "public", cutoff)[0] and p["status"] != "duplicate"
 
 
-def checklist(case: Case, target: str) -> list[dict]:
-    """Автоматические замечания к выводу. level: block — пройти ревью нельзя; warn — ревьюер должен разобрать."""
+def checklist(case: Case, target: str, decision: str = "") -> list[dict]:
+    """Автоматические замечания к выводу. level: block — пройти ревью нельзя; warn — разобрать; human — нужен человек.
+    decision — проверяемое решение: запись оценивается так, будто оно уже принято (например, статус strongly-corroborated)."""
     register, row = case.get(target)
-    if register == "reviews":  # kin review checklist V-… — проверяем цель ревью
-        return checklist(case, row["target_id"])
+    if register == "reviews":  # kin review checklist V-… — проверяем цель ревью и её решение
+        return checklist(case, row["target_id"], row.get("decision", ""))
+    if decision and decision != "merge":
+        row = {**row, "status": decision.split(":", 1)[1]}
     arts = case.index("artifacts")
     found: list[dict] = []
 
@@ -190,11 +212,24 @@ def checklist(case: Case, target: str) -> list[dict]:
 # ------------------------------------------------------------------ ревью
 
 
-def request_review(case: Case, target: str, reviewer: str, actor: str) -> dict:
+def _linked_ids(case: Case, target: str) -> set[str]:
+    """Записи, изменение которых делает ревью устаревшим: сама запись, её утверждения и источники."""
+    register, row = case.get(target)
+    ids = {target}
+    if register == "hypotheses":
+        ids |= set(split_ids(row.get("claim_ids")))
+    elif register == "relationships":
+        ids |= set(split_ids(row.get("claim_ids")))
+    ids |= _related_artifacts(case, register, row)
+    return ids
+
+
+def request_review(case: Case, target: str, reviewer: str, actor: str, decision: str = "") -> dict:
     case.get(target)
-    checks = checklist(case, target)
+    checks = checklist(case, target, decision)
     return case.add("reviews", {
-        "target_id": target, "authors": ";".join(sorted(a for a in authors(case, target) if a)),
+        "target_id": target, "decision": decision,
+        "authors": ";".join(sorted(a for a in authors(case, target) if a)),
         "reviewer": reviewer, "status": "requested",
         "auto_findings": " | ".join(f"[{c['level']}] {c['text']}" for c in checks),
         "human_required": "yes" if any(c["level"] == "human" for c in checks) else "no",
@@ -204,14 +239,15 @@ def request_review(case: Case, target: str, reviewer: str, actor: str) -> dict:
 def submit_review(case: Case, review_id: str, verdict: str, findings: str, checked: list[str], actor: str) -> dict:
     if verdict not in ("passed", "failed", "needs-work"):
         raise KinError("Вердикт: passed, failed или needs-work")
+    actor = " ".join((actor or "").split())
     _, rev = case.get(review_id)
     if rev["status"] != "requested":
         raise KinError(f"{review_id} уже завершено ({rev['status']}); для повторной проверки — новый запрос")
-    target = rev["target_id"]
-    done_by = {a.casefold() for a in authors(case, target) | set(split_ids(rev.get("authors"))) if a}
-    if actor.casefold() in done_by or actor.casefold() in ("", "user"):
+    target, decision = rev["target_id"], rev.get("decision", "")
+    done_by = authors(case, target) | {norm_actor(a) for a in split_ids(rev.get("authors"))}
+    if norm_actor(actor) in done_by or norm_actor(actor) in ("", "user"):
         raise KinError(f"Проверяющий «{actor}» должен быть другой ролью/человеком, чем исполнители "
-                       f"({', '.join(sorted(done_by)) or '—'}). Укажите --as \"Evidence Reviewer\".")
+                       f"({', '.join(sorted(a for a in done_by if a)) or '—'}). Укажите --as \"Evidence Reviewer\".")
     register, row = case.get(target)
     related = _related_artifacts(case, register, row)
     unknown = set(checked) - related
@@ -219,47 +255,68 @@ def submit_review(case: Case, review_id: str, verdict: str, findings: str, check
         raise KinError(f"Проверенные источники {sorted(unknown)} не относятся к {target}. Относятся: {sorted(related) or 'нет'}")
     if related and not checked:
         raise KinError("Ревьюер проверяет первичные источники, а не резюме: перечислите прочитанные --checked A-…")
-    checks = checklist(case, target)
+    checks = checklist(case, target, decision)
     blocking = [c["text"] for c in checks if c["level"] == "block"]
     if verdict == "passed" and blocking:
         raise KinError("Нельзя пройти ревью при блокирующих замечаниях:\n- " + "\n- ".join(blocking))
     if verdict != "passed" and not findings:
         raise KinError("Для failed/needs-work опишите недостатки в --findings")
+    human = "yes" if any(c["level"] == "human" for c in checks) else rev.get("human_required", "no")
     row = case.update(review_id, {
         "status": verdict, "reviewer": actor, "findings": findings, "checked_artifact_ids": ";".join(checked),
         "auto_findings": " | ".join(f"[{c['level']}] {c['text']}" for c in checks),
-        "human_required": "yes" if any(c["level"] == "human" for c in checks) else rev.get("human_required", "no"),
-        "completed_at": TODAY()}, actor)
-    case.journal(actor, "review", target, {"review": review_id, "verdict": verdict})
+        "human_required": human, "completed_at": TODAY()}, actor, op="review-record")
+    # засчитывается именно эта запись журнала, а не поля строки реестра
+    case.journal(actor, "review", target, {"review": review_id, "verdict": verdict, "decision": decision,
+                                           "human_required": human, "checked": checked})
     return row
 
 
 def human_decide(case: Case, review_id: str, by: str, accept: bool, note: str) -> dict:
+    by = " ".join((by or "").split())
+    if norm_actor(by) in ("", "user"):
+        raise KinError("Решение принимает человек: --by «Имя»")
     _, rev = case.get(review_id)
     if rev["status"] != "passed":
         raise KinError("Решение человека принимается по пройденному ревью")
     text = f"{by}: {'принять' if accept else 'отклонить'}" + (f" — {note}" if note else "")
-    row = case.update(review_id, {"human_decision": text} if accept else {"human_decision": text, "status": "failed"}, by)
+    row = case.update(review_id, {"human_decision": text} if accept else {"human_decision": text, "status": "failed"},
+                      by, op="review-record")
+    case.journal(by, "human-decision", rev["target_id"], {"review": review_id, "accept": accept, "note": note})
     return row
 
 
-def review_ok(case: Case, target: str) -> tuple[bool, str]:
-    """Есть ли пройденное ревью (и решение человека, если требовалось) после последнего изменения записи.
-    Порядок определяется позицией в журнале (append-only), а не временем — правка в ту же секунду тоже учитывается."""
+def review_ok(case: Case, target: str, decision: str) -> tuple[bool, str]:
+    """Можно ли принять решение decision по target.
+
+    Засчитывается запись журнала «review» (не строка реестра): вердикт passed по этому target и этому решению,
+    поставленный не исполнителем, ПОСЛЕ последнего содержательного изменения записи и связанных с ней
+    утверждений и источников (решение по статусу — не содержательное изменение). Для «нужен человек» —
+    запись «human-decision» после ревью. Дополнительно чек-лист решения перепроверяется сейчас."""
+    blocking = [c["text"] for c in checklist(case, target, decision) if c["level"] == "block"]
+    if blocking:
+        return False, "блокирующие замечания: " + "; ".join(blocking)
     entries = journal(case)
+    linked = _linked_ids(case, target)
     last_change = max((i for i, j in enumerate(entries)
-                       if j.get("id") == target and j.get("op") in ("add", "update")), default=-1)
-    for rev in reversed(case.rows("reviews")):
-        if rev["target_id"] != target or rev["status"] != "passed":
+                       if j.get("id") in linked and j.get("op") in ("add", "update")), default=-1)
+    done_by = authors(case, target)
+    for i in range(len(entries) - 1, last_change, -1):
+        j = entries[i]
+        d = j.get("data", {})
+        if j.get("op") != "review" or j.get("id") != target or d.get("decision", "") != decision:
             continue
-        reviewed_at = max((i for i, j in enumerate(entries) if j.get("op") == "review"
-                           and j.get("data", {}).get("review") == rev["review_id"]), default=-1)
-        if reviewed_at < last_change:
-            continue  # запись менялась после ревью
-        if rev.get("human_required") == "yes" and not rev.get("human_decision", "").strip():
-            return False, f"{rev['review_id']} пройдено, но нужно решение человека: kin review decide {rev['review_id']} --by «Имя»"
-        return True, rev["review_id"]
-    return False, f"нет пройденного ревью {target} после его последнего изменения: kin review request {target}, затем проверка другой ролью"
+        if d.get("verdict") != "passed" or norm_actor(j.get("actor", "")) in done_by:
+            continue
+        if d.get("human_required") == "yes":
+            human = any(k.get("op") == "human-decision" and k.get("data", {}).get("review") == d.get("review")
+                        and k.get("data", {}).get("accept") for k in entries[i + 1:])
+            if not human:
+                return False, f"{d.get('review')} пройдено, но нужно решение человека: kin review decide {d.get('review')} --by «Имя»"
+        return True, d.get("review", "")
+    short = decision.split(":")[-1]
+    return False, (f"нет пройденного ревью решения «{decision}» после последних изменений {target} и связанных записей: "
+                   f"kin review request {target} --for {short}, затем проверка другой ролью")
 
 
 # ------------------------------------------------------------------ задачи
@@ -402,10 +459,10 @@ def hypothesis_status(case: Case, hid: str, new: str, reason: str, actor: str, r
         raise KinError("Опровержение требует источников «против» (contradicting_artifact_ids): "
                        "отсутствие находки — не опровержение. Возможно, подходит parked.")
     if new in ("accepted", "rejected") and requires_review(case, f"hypothesis:{new}"):
-        ok, why = review_ok(case, hid)
+        ok, why = review_ok(case, hid, f"hypothesis:{new}")
         if not ok:
             raise KinError(f"{hid} → {new}: {why}")
-    row = case.update(hid, changes, actor)
+    row = case.update(hid, changes, actor, op="status-decision")
     decision(case, actor, hid, {"action": "status", "from": h["status"], "to": new, "reason": reason})
     return row
 
@@ -414,7 +471,9 @@ def hypothesis_status(case: Case, hid: str, new: str, reason: str, actor: str, r
 
 
 def _norm(text: str) -> set[str]:
-    return {w for w in re.findall(r"\w+", (text or "").casefold().replace("ё", "е")) if len(w) > 2}
+    """Слова длиннее 2 букв и все числа (номера фондов, описей, дел различают источники)."""
+    words = re.findall(r"\w+", (text or "").casefold().replace("ё", "е"))
+    return {w for w in words if len(w) > 2 or w.isdigit()}
 
 
 def _overlap(a: str, b: str) -> bool:
@@ -428,17 +487,26 @@ def _overlap(a: str, b: str) -> bool:
     return a1 <= b2 and b1 <= a2
 
 
-def similar_searches(case: Case, source: str, query: str, period: str = "") -> list[dict]:
-    """Прежние безрезультатные поиски того же: похожий источник, похожий запрос, пересекающийся период."""
+def similar_searches(case: Case, source: str, query: str, period: str = "", persons: str = "") -> list[dict]:
+    """Прежние безрезультатные поиски того же: похожий источник (с теми же номерами), похожий запрос,
+    пересекающийся период и те же люди (если указаны в обоих). Транслитерацию и синонимы не распознаёт —
+    перед поиском агент смотрит kin status → «Проверено без результата»."""
     src, q = _norm(source), _norm(query)
+    who = {case.resolve_person(p) for p in split_ids(persons)}
     out = []
     for s in case.rows("searches"):
         if s["result"] not in ("not-found", "partial", "blocked", "error"):
             continue
         s_src, s_q = _norm(s["source"]), _norm(s.get("query", ""))
+        nums, s_nums = {w for w in src if w.isdigit()}, {w for w in s_src if w.isdigit()}
+        if nums and s_nums and nums != s_nums:
+            continue  # другой фонд/опись/дело
+        s_who = {case.resolve_person(p) for p in split_ids(s.get("target_person_ids"))}
+        if who and s_who and not (who & s_who):
+            continue  # искали других людей
         src_sim = len(src & s_src) / max(1, len(src | s_src))
         q_sim = len(q & s_q) / max(1, len(q | s_q)) if (q or s_q) else 1.0
-        if src_sim >= 0.5 and q_sim >= 0.5 and _overlap(period, s.get("period", "")):
+        if src_sim >= 0.5 and q_sim >= 0.6 and _overlap(period, s.get("period", "")):
             out.append(s)
     return out
 
@@ -446,7 +514,8 @@ def similar_searches(case: Case, source: str, query: str, period: str = "") -> l
 def guard_search(case: Case, values: dict) -> None:
     if values.get("new_basis"):
         return
-    prev = similar_searches(case, values.get("source", ""), values.get("query", ""), values.get("period", ""))
+    prev = similar_searches(case, values.get("source", ""), values.get("query", ""), values.get("period", ""),
+                            values.get("target_person_ids", ""))
     if prev:
         lines = [f"{s['search_id']} {s['date']} {s['source']}: {s.get('query', '')} [{s.get('period', '')}] → {s['result']}"
                  + (f"; повторить, если: {s['repeat_when']}" if s.get("repeat_when") else "") for s in prev]

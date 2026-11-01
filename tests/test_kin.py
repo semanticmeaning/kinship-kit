@@ -182,7 +182,7 @@ class TestEvidence(Base):
         self.kin("update", "C-0001", "status=corroborated", "rationale=две независимые группы")
         # слияние — значимый вывод: нужно независимое ревью identity-утверждения
         self.assertIn("ревью", self.kin("person", "merge", p2, p1, ok=False).stderr)
-        self.kin("review", "request", "C-0001")
+        self.kin("review", "request", "C-0001", "--for", "merge")
         self.kin("review", "submit", "V-0001", "--verdict", "passed", "--checked", f"{a1};{a2}",
                  "--findings", "Обе записи прочитаны", "--as", "Evidence Reviewer")
         self.assertIn("решение человека", self.kin("person", "merge", p2, p1, ok=False).stderr)  # P-2 возможно жив
@@ -335,7 +335,7 @@ class TestPrivacyEdgeCases(Base):
     def test_duplicate_of_hidden_person_is_leak_checked(self):
         main = self.person("Корнев Дмитрий Андреевич", "living", "identity-confirmed")
         dup = self.person("Корнев Дмитрий (анкета)", "living", "candidate")
-        self.kin("person", "merge", dup, main, "--force", "--reason", "тест")
+        self.kin("person", "merge", dup, main, "--force", "--reason", "тест", "--by", "Тестовый Пользователь")
         terms = publish.forbidden_terms(Case(self.case), dict.fromkeys([main, dup], ""))
         import re
         self.assertTrue(any(re.search(t, publish._fold(f"id {dup}")) for t in terms))

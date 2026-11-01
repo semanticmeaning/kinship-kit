@@ -21,6 +21,15 @@ HERE = Path(__file__).resolve().parent
 
 # {версия_откуда: {реестр: {старое_поле: новое_поле}}}
 RENAMES: dict[int, dict[str, dict[str, str]]] = {1: {}}
+def _v1_tasks(row: dict) -> dict:
+    """В v1 платность писали текстом в constraints — сохранить защиту согласием."""
+    if not row.get("cost") and any(w in row.get("constraints", "").casefold() for w in ("плат", "paid", "счёт", "счет")):
+        row["cost"] = "paid"
+    return row
+
+
+# {версия_откуда: {реестр: функция(строка-словарь в новой схеме) -> строка}}
+TRANSFORMS = {1: {"tasks": _v1_tasks}}
 NOTES = {1: "v1→v2: задачи — тип, ценность, стоимость, доступ, внешний сервис, согласие, файл задания; "
             "поиск — основание повтора; новые реестры reviews (V-) и requests (Q-)."}
 
@@ -70,7 +79,13 @@ def _step(root: Path, version: int) -> str:
         lost = set(mapping) - set(new_fields)
         if lost:
             raise KinError(f"{name}: поля {sorted(lost)} исчезают в v{version + 1} без переименования — миграция остановлена")
-        out = [new_fields] + [[row[mapping[f]] if f in mapping else "" for f in new_fields] for row in rows[1:]]
+        transform = TRANSFORMS.get(version, {}).get(name)
+        out = [new_fields]
+        for row in rows[1:]:
+            item = {f: (row[mapping[f]] if f in mapping else "") for f in new_fields}
+            if transform:
+                item = transform(item)
+            out.append([item[f] for f in new_fields])
         staged[path] = out
     # запись только после успешной проверки всех реестров
     for path, rows in staged.items():
@@ -88,7 +103,7 @@ def migrate(root: Path, actor: str = "user", dry_run: bool = False) -> list[str]
         return []
     if dry_run:
         return [NOTES.get(v, f"v{v}→v{v + 1}") for v in steps]
-    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     backup = root / ".kin" / f"backup-v{current}-{stamp}"
     backup.mkdir(parents=True)
     shutil.copytree(root / REGISTRY_DIR, backup / REGISTRY_DIR)

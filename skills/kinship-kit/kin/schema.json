@@ -837,6 +837,10 @@
           "doc": "Что проверяется: H-, C-, R-, P- (слияние), T-"
         },
         {
+          "name": "decision",
+          "doc": "Какое решение проверяется: hypothesis:accepted, hypothesis:rejected, claim:strongly-corroborated, merge; пусто — общее ревью"
+        },
+        {
           "name": "authors",
           "doc": "Кто менял проверяемую запись (из журнала) — проверяющий не из их числа"
         },
