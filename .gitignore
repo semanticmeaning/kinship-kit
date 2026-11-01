@@ -8,3 +8,5 @@ journal.jsonl
 site/
 publish/
 .kin/
+# личные инструкции разработчика (могут содержать пути к приватным делам)
+CLAUDE.local.md
