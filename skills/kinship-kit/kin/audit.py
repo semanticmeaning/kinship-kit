@@ -182,6 +182,30 @@ def run(case: Case) -> dict:
         if s["result"] == "not-found" and not s.get("disallowed_conclusions"):
             warnings.append(f"{s['search_id']}: отрицательный поиск без disallowed_conclusions (что из него нельзя выводить)")
 
+    # 8. Независимое ревью (политика дела: case.json → review.required_for)
+    from . import workflow  # локальный импорт: workflow сам использует аудит
+    for h in case.rows("hypotheses"):
+        if h["status"] in ("accepted", "rejected") and workflow.requires_review(case, f"hypothesis:{h['status']}"):
+            ok, why = workflow.review_ok(case, h["hypothesis_id"])
+            if not ok:
+                errors.append(f"{h['hypothesis_id']}: {h['status']} без независимого ревью — {why}")
+    for cid, c in claims.items():
+        if c["status"] == "strongly-corroborated" and workflow.requires_review(case, "claim:strongly-corroborated"):
+            ok, why = workflow.review_ok(case, cid)
+            if not ok:
+                errors.append(f"{cid}: strongly-corroborated без независимого ревью — {why}")
+    for r in case.rows("reviews"):
+        if r["status"] in ("passed", "failed", "needs-work"):
+            if r.get("reviewer", "").casefold() in {a.casefold() for a in split_ids(r.get("authors"))}:
+                errors.append(f"{r['review_id']}: проверяющий совпадает с исполнителем ({r['reviewer']})")
+            if r["status"] == "passed" and not split_ids(r.get("checked_artifact_ids")):
+                warnings.append(f"{r['review_id']}: пройдено без проверки первичных источников")
+    for q in case.rows("requests"):
+        if q["status"] == "sent" and not q.get("sent_date"):
+            warnings.append(f"{q['request_id']}: отправлен, но нет sent_date")
+        if q["status"] == "answered" and not split_ids(q.get("response_artifact_ids")):
+            warnings.append(f"{q['request_id']}: ответ получен, но не зарегистрирован как источник")
+
     counts = {name: len(case.rows(name)) for name in REGISTERS}
     summary = {
         "claims_by_status": dict(Counter(c["status"] for c in claims.values())),

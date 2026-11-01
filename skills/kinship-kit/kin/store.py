@@ -95,7 +95,8 @@ class Case:
         self.config = json.loads((self.root / CASE_FILE).read_text(encoding="utf-8"))
         version = self.config.get("schema_version")
         if version != SCHEMA_VERSION:
-            raise KinError(f"Версия схемы дела {version}, версия kin {SCHEMA_VERSION}: нужна миграция (kin migrate).")
+            raise KinError(f"Версия схемы дела v{version}, версия kin v{SCHEMA_VERSION}: обновите дело — kin migrate "
+                           "(сначала можно kin migrate --dry-run; резервная копия создаётся автоматически).")
         self._cache: dict[str, list[dict]] = {}
         self._lock_depth = 0
 
@@ -318,7 +319,7 @@ def init_case(root: Path, title: str, language: str = "ru", git: bool = True) ->
         with contextlib.suppress(ValueError):
             root.relative_to(kit_root)
             raise KinError(f"Нельзя создавать дело внутри публичного репозитория набора ({kit_root}).")
-    for sub in (REGISTRY_DIR, "sources", "publish", ".kin"):
+    for sub in (REGISTRY_DIR, "sources", "publish", ".kin", "tasks", "requests"):
         (root / sub).mkdir(parents=True, exist_ok=True)
     for name in REGISTERS:
         p = root / REGISTRY_DIR / REGISTERS[name]["file"]

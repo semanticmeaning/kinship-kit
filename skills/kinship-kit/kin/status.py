@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import json
 
-from . import audit
+import datetime as dt
+
+from . import audit, workflow
 from .store import Case, split_ids
 
 ACTIVE_H = ("open", "testing")
@@ -47,26 +49,11 @@ def collect(case: Case) -> dict:
         if t.get("hypothesis_id"):
             tasks_by_h.setdefault(t["hypothesis_id"], []).append(t["task_id"])
 
-    nxt = None
-    if a["errors"]:
-        nxt = {"kind": "fix-audit", "text": f"Исправить ошибки аудита ({len(a['errors'])}): kin audit"}
-    elif by_status["in-progress"]:
-        t = by_status["in-progress"][0]
-        nxt = {"kind": "continue-task", "id": t["task_id"], "text": f"Продолжить {t['task_id']}: {t['goal']}"}
-    elif by_status["in-review"]:
-        t = by_status["in-review"][0]
-        nxt = {"kind": "review", "id": t["task_id"], "text": f"Независимое ревью {t['task_id']}: {t['goal']}"}
-    elif by_status["ready"]:
-        t = by_status["ready"][0]
-        nxt = {"kind": "start-task", "id": t["task_id"], "text": f"Начать {t['task_id']} (приоритет {t.get('priority') or '—'}): {t['goal']}"}
-    else:
-        orphan = [h for h in hyps if h["hypothesis_id"] not in tasks_by_h]
-        if orphan:
-            h = orphan[0]
-            nxt = {"kind": "plan-task", "id": h["hypothesis_id"], "text": f"Поставить задачу для {h['hypothesis_id']}: {h['statement']}"}
-        elif open_claims:
-            c = open_claims[0]
-            nxt = {"kind": "resolve-claim", "id": c["claim_id"], "text": f"Разобрать противоречие {c['claim_id']}: {c['statement']}"}
+    nxt = workflow.next_summary(case)
+    today = dt.date.today().isoformat()
+    requests = [r for r in case.rows("requests") if r["status"] in ("draft", "ready", "sent")]
+    reviews = [r for r in case.rows("reviews") if r["status"] == "requested"
+               or (r["status"] == "passed" and r.get("human_required") == "yes" and not r.get("human_decision"))]
     return {
         "case": case.config.get("title", ""),
         "path": str(case.root),
@@ -84,6 +71,12 @@ def collect(case: Case) -> dict:
         "open_contradictions": [{"id": c["claim_id"], "statement": c["statement"]} for c in open_claims],
         "recent_changes": [{"ts": j.get("ts"), "actor": j.get("actor"), "op": j.get("op"), "id": j.get("id")}
                            for j in _journal_tail(case, 8)],
+        "reviews_pending": [{"id": r["review_id"], "target": r["target_id"], "status": r["status"],
+                             "human": r.get("human_required") == "yes"} for r in reviews],
+        "requests_open": [{"id": r["request_id"], "recipient": r["recipient"], "subject": r["subject"],
+                           "status": r["status"], "due": r.get("due_date", ""),
+                           "overdue": bool(r["status"] == "sent" and r.get("due_date") and r["due_date"] < today)}
+                          for r in requests],
         "next": nxt,
     }
 
@@ -111,6 +104,15 @@ def format_text(s: dict) -> str:
         for n in s["checked_negative"]:
             rep = f"; повторить, если: {n['repeat_when']}" if n["repeat_when"] else ""
             out.append(f"- {n['id']} {n['date']} {n['source']}: {n['query']} [{n['period']}] → {n['result']}{rep}")
+    if s["reviews_pending"]:
+        out.append(f"\nРевью ждут ({len(s['reviews_pending'])}):")
+        out += [f"- {r['id']} → {r['target']}" + (" — нужно решение человека" if r["status"] == "passed" else "")
+                for r in s["reviews_pending"]]
+    if s["requests_open"]:
+        out.append(f"\nЗапросы в архивы ({len(s['requests_open'])}):")
+        out += [f"- {r['id']} [{r['status']}] {r['recipient']}: {r['subject']}"
+                + (f" — срок {r['due']}" if r["due"] else "") + (" — ПРОСРОЧЕН" if r["overdue"] else "")
+                for r in s["requests_open"]]
     if s["open_contradictions"]:
         out.append(f"\nНерешённые противоречия ({len(s['open_contradictions'])}):")
         out += [f"- {c['id']} {c['statement']}" for c in s["open_contradictions"]]

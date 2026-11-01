@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-EMAIL_OK = re.compile(r"@(example\.(org|com|net)|anthropic\.com)$")
+EMAIL_OK = re.compile(r"@(example\.(org|com|net|invalid)|anthropic\.com)$")
 PHONE = re.compile(r"(?<![\w-])(?:\+\d[\d\s()-]{8,}\d|8\s?\(\d{3}\)\s?\d{3}[\s-]?\d{2}[\s-]?\d{2})(?!\w)")
 SECRETS = [re.compile(p) for p in (r"-----BEGIN [A-Z ]*PRIVATE KEY", r"\bghp_[A-Za-z0-9]{20,}", r"\bsk-ant-[\w-]{10,}",
                                     r"\bAKIA[0-9A-Z]{16}\b", r"\bxox[bp]-[\w-]{10,}")]

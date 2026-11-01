@@ -10,7 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import __version__, audit, publish, site, status
+from . import __version__, audit, cli_workflow, publish, site, status, workflow
 from .store import (REGISTERS, SCHEMA, Case, KinError, field_names, find_case_dir, init_case,
                     register_by_prefix, sha256_file, split_ids)
 
@@ -186,6 +186,12 @@ def cmd_add(args) -> int:
     values = json.loads(args.json_data) if args.json_data else {}
     values.update(_pairs(args.set))
     _guard_merge(args.register, values)
+    if args.register == "searches":
+        with case.lock():
+            workflow.guard_search(case, values)
+            row = case.add(args.register, values, _actor(args))
+        _print_row(args, row)
+        return 0
     row = case.add(args.register, values, _actor(args))
     _print_row(args, row)
     return 0
@@ -204,7 +210,17 @@ def cmd_update(args) -> int:
     case = _case(args)
     changes = _pairs(args.pairs)
     append = _pairs(args.append)
-    _guard_merge(register_by_prefix(args.id), {**changes, **append})
+    register = register_by_prefix(args.id)
+    _guard_merge(register, {**changes, **append})
+    if register == "hypotheses" and "status" in changes:
+        raise KinError("Статус гипотезы — командой kin hypothesis status H-… <статус> --reason «…» (история решений, ревью)")
+    if register == "claims" and changes.get("status") == "strongly-corroborated" \
+            and workflow.requires_review(case, "claim:strongly-corroborated"):
+        ok, why = workflow.review_ok(case, args.id)
+        if not ok:
+            raise KinError(f"{args.id} → strongly-corroborated: {why}")
+    if register == "tasks" and "user_consent" in changes:
+        raise KinError("Согласие пользователя — командой kin task consent T-… --granted|--denied --by «Имя»")
     row = case.update(args.id, changes, _actor(args), append=append)
     _print_row(args, row, "обновлено")
     return 0
@@ -293,6 +309,10 @@ def cmd_merge(args) -> int:
                        "(две независимые группы источников). Пока — отметьте возможное тождество "
                        "(claim identity со статусом hypothesis) и держите записи раздельно. "
                        "Осознанно вопреки правилу — --force --reason «…».")
+    if basis and not args.force and workflow.requires_review(case, "merge"):
+        ok, why = workflow.review_ok(case, basis)
+        if not ok:
+            raise KinError(f"Слияние по {basis} требует независимого ревью этого утверждения: {why}")
     reason = args.reason or (f"Тождество подтверждено {basis}" if basis else "")
     if not reason:
         raise KinError("--force требует --reason")
@@ -612,6 +632,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_publish)
 
     g = sub.add_parser("site", help="Сайт-схема").add_subparsers(dest="sub", required=True)
+    cli_workflow.add_site_publish(g, _common)
     p = g.add_parser("build")
     p.add_argument("--profile", default="private", choices=publish.PROFILES)
     p.add_argument("--allow-errors", action="store_true")
@@ -626,6 +647,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--i-know-its-public", action="store_true")
     _common(p)
     p.set_defaults(fn=cmd_site_serve)
+
+    cli_workflow.add_commands(sub, _common)
 
     p = sub.add_parser("doctor", help="Проверка окружения, размещения дела и приватности")
     _common(p)

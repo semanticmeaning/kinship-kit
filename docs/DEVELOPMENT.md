@@ -18,6 +18,14 @@ Task → Implementation → Automated Tests → Independent Review → Correctio
 совместимость данных проверена (изменение схемы → `schema_version` + миграция); пройдены нужные ревью;
 приватность соблюдена (`tools/check_repo.py`, публичная сборка демо без живых).
 
+## Роли разработки
+Software Engineer, Code Reviewer, Security & Privacy Reviewer — `.claude/agents/` и `.codex/agents/` этого репозитория.
+Исходники ролей — `skills/kinship-kit/roles/*.md`; после правки: `bin/kin agents install --set dev --target .`.
+
+## Изменение схемы данных
+1. Скопировать текущую `kin/schema.json` в `kin/schemas/v<N>.json`. 2. Изменить схему, `schema_version = N+1`.
+3. В `kin/migrations.py` — `RENAMES[N]` (если поля переименованы) и `NOTES[N]`. 4. Тест миграции на деле vN.
+
 ## Демо-дело
 ```bash
 python3 examples/demo/build_demo.py ~/kinship-cases/demo-vetluginy

@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "id_list_separator": ";",
+  "date_format": "EDTF-lite: YYYY, YYYY-MM, YYYY-MM-DD; суффикс ~ (приблизительно) или ? (сомнительно); интервал A/B; открытый интервал ../B или A/..; пусто — неизвестно",
+  "registers": {
+    "artifacts": {
+      "file": "artifacts.csv",
+      "id": "artifact_id",
+      "prefix": "A-",
+      "title": "Источники (артефакты): документы, образы, индексы, рассказы",
+      "fields": [
+        {"name": "artifact_id"},
+        {"name": "title", "required": true, "doc": "Краткое название источника"},
+        {"name": "kind", "type": "enum", "required": true, "enum": ["document-image", "transcript", "index-record", "official-extract", "web-page", "photo", "family-tree", "family-oral", "letter", "book", "other"]},
+        {"name": "file", "doc": "Путь внутри папки дела (sources/…); оригинал не изменяется"},
+        {"name": "sha256", "type": "sha256", "doc": "Контрольная сумма файла; ставится автоматически"},
+        {"name": "url", "doc": "Электронный адрес источника"},
+        {"name": "repository", "doc": "Архив / база / владелец"},
+        {"name": "archival_reference", "doc": "Шифр: фонд, опись, дело, лист"},
+        {"name": "record_date", "type": "date", "doc": "Дата создания записи (не события)"},
+        {"name": "place_as_written", "doc": "Место, как написано в источнике"},
+        {"name": "language_script"},
+        {"name": "directness", "type": "enum", "enum": ["", "direct", "indirect", "negative"]},
+        {"name": "originality", "type": "enum", "enum": ["", "original", "image-of-original", "official-extract", "transcript", "index", "derivative", "family-information"]},
+        {"name": "independence_group", "doc": "Копии, индексы и пересказы одной записи — одна группа"},
+        {"name": "provenance", "doc": "Откуда и как получено"},
+        {"name": "captured_at", "type": "date"},
+        {"name": "scan_publication", "type": "enum", "enum": ["", "deny", "allow"], "doc": "Разрешение показывать образ публично; пусто = нет"},
+        {"name": "summary"},
+        {"name": "notes", "private": true}
+      ]
+    },
+    "mentions": {
+      "file": "mentions.csv",
+      "id": "mention_id",
+      "prefix": "M-",
+      "title": "Упоминания: человек так, как он записан в конкретном источнике",
+      "fields": [
+        {"name": "mention_id"},
+        {"name": "artifact_id", "type": "ref", "ref": "artifacts", "required": true},
+        {"name": "name_as_written", "required": true},
+        {"name": "role", "type": "enum", "enum": ["", "subject", "child", "father", "mother", "groom", "bride", "spouse", "deceased", "godparent", "witness", "informant", "head-of-household", "household-member", "soldier", "other"]},
+        {"name": "age_as_written"},
+        {"name": "date_as_written"},
+        {"name": "place_as_written"},
+        {"name": "details", "doc": "Прочие сведения записи дословно (сословие, занятие, приход)"},
+        {"name": "person_id", "type": "ref", "ref": "persons", "doc": "С кем отождествлено (может быть пусто)"},
+        {"name": "link_status", "type": "enum", "enum": ["", "unlinked", "possible", "probable", "confirmed", "rejected"]},
+        {"name": "link_rationale"},
+        {"name": "notes", "private": true}
+      ]
+    },
+    "persons": {
+      "file": "persons.csv",
+      "id": "person_id",
+      "prefix": "P-",
+      "title": "Установленные личности (исследовательская сущность)",
+      "fields": [
+        {"name": "person_id"},
+        {"name": "preferred_label", "required": true, "doc": "Фамилия Имя Отчество; варианты и девичья — в скобках"},
+        {"name": "sex", "type": "enum", "enum": ["", "m", "f", "u"]},
+        {"name": "living_status", "type": "enum", "required": true, "enum": ["living", "deceased", "unknown"]},
+        {"name": "name_variants", "type": "list", "doc": "Альтернативные имена и написания через ;"},
+        {"name": "birth_estimate", "type": "date", "doc": "Рабочая оценка; доказательства — в claims"},
+        {"name": "death_estimate", "type": "date"},
+        {"name": "places", "type": "list"},
+        {"name": "status", "type": "enum", "required": true, "enum": ["tree-entry-unverified", "family-reported", "candidate", "identity-probable", "identity-confirmed", "hypothesis", "unlikely", "duplicate"]},
+        {"name": "line", "doc": "ID линии поиска из case.json"},
+        {"name": "merged_into", "type": "ref", "ref": "persons", "doc": "Для status=duplicate"},
+        {"name": "merge_rationale"},
+        {"name": "publication", "type": "enum", "enum": ["", "deny", "allow"], "doc": "Явное решение о публикации; allow для живого — только с согласием"},
+        {"name": "notes", "private": true}
+      ]
+    },
+    "claims": {
+      "file": "claims.csv",
+      "id": "claim_id",
+      "prefix": "C-",
+      "title": "Утверждения: что источник(и) говорят о людях; конкурирующие версии — отдельными строками",
+      "fields": [
+        {"name": "claim_id"},
+        {"name": "claim_type", "type": "enum", "required": true, "enum": ["birth", "baptism", "death", "burial", "marriage", "divorce", "widowhood", "residence", "occupation", "name", "military", "repression", "migration", "parentage", "sibling", "kinship", "identity", "other"]},
+        {"name": "subject_person_ids", "type": "refs", "ref": "persons", "required": true},
+        {"name": "statement", "required": true},
+        {"name": "date", "type": "date"},
+        {"name": "place"},
+        {"name": "artifact_ids", "type": "refs", "ref": "artifacts", "doc": "Источники «за»"},
+        {"name": "mention_ids", "type": "refs", "ref": "mentions"},
+        {"name": "contradicting_artifact_ids", "type": "refs", "ref": "artifacts", "doc": "Источники «против»"},
+        {"name": "competing_claim_ids", "type": "refs", "ref": "claims", "doc": "Конкурирующие версии того же факта"},
+        {"name": "status", "type": "enum", "required": true, "enum": ["hypothesis", "single-source", "corroborated", "strongly-corroborated", "contradicted", "unresolved", "rejected", "superseded"]},
+        {"name": "confidence", "type": "enum", "enum": ["", "low", "medium", "high"]},
+        {"name": "rationale"},
+        {"name": "supersedes", "type": "ref", "ref": "claims", "doc": "Прежняя версия вывода (история выводов)"},
+        {"name": "reviewed_by"},
+        {"name": "next_action"}
+      ]
+    },
+    "relationships": {
+      "file": "relationships.csv",
+      "id": "relationship_id",
+      "prefix": "R-",
+      "title": "Связи — только если родство прямо названо в источнике",
+      "fields": [
+        {"name": "relationship_id"},
+        {"name": "person_a_id", "type": "ref", "ref": "persons", "required": true},
+        {"name": "relationship_type", "type": "enum", "required": true, "enum": ["parent-of", "spouse-of", "sibling-of", "other"]},
+        {"name": "person_b_id", "type": "ref", "ref": "persons", "required": true},
+        {"name": "nature", "type": "enum", "enum": ["", "biological", "legal", "household", "unknown"]},
+        {"name": "claim_ids", "type": "refs", "ref": "claims"},
+        {"name": "supporting_artifact_ids", "type": "refs", "ref": "artifacts"},
+        {"name": "contradicting_artifact_ids", "type": "refs", "ref": "artifacts"},
+        {"name": "status", "type": "enum", "required": true, "enum": ["hypothesis", "single-source", "corroborated", "strongly-corroborated", "contradicted", "unresolved", "rejected", "superseded"]},
+        {"name": "rationale"}
+      ]
+    },
+    "places": {
+      "file": "places.csv",
+      "id": "place_id",
+      "prefix": "L-",
+      "title": "Места с исторической принадлежностью",
+      "fields": [
+        {"name": "place_id"},
+        {"name": "name", "required": true},
+        {"name": "name_variants", "type": "list"},
+        {"name": "kind", "type": "enum", "enum": ["", "village", "town", "city", "parish", "volost", "uezd", "guberniya", "oblast", "raion", "country", "other"]},
+        {"name": "jurisdictions", "doc": "Принадлежность по периодам: «1797–1924: …губ., …у.; 1924–1930: …»"},
+        {"name": "modern_name"},
+        {"name": "coordinates"},
+        {"name": "notes", "private": true}
+      ]
+    },
+    "hypotheses": {
+      "file": "hypotheses.csv",
+      "id": "hypothesis_id",
+      "prefix": "H-",
+      "title": "Исследовательские гипотезы",
+      "fields": [
+        {"name": "hypothesis_id"},
+        {"name": "statement", "required": true},
+        {"name": "person_ids", "type": "refs", "ref": "persons"},
+        {"name": "claim_ids", "type": "refs", "ref": "claims", "doc": "Проверяемые утверждения"},
+        {"name": "supporting_artifact_ids", "type": "refs", "ref": "artifacts"},
+        {"name": "contradicting_artifact_ids", "type": "refs", "ref": "artifacts"},
+        {"name": "alternatives", "doc": "Альтернативные объяснения"},
+        {"name": "open_contradictions"},
+        {"name": "test_plan"},
+        {"name": "status", "type": "enum", "required": true, "enum": ["open", "testing", "supported", "weakened", "rejected", "parked", "accepted"]},
+        {"name": "reopen_conditions"},
+        {"name": "owner"},
+        {"name": "notes", "private": true}
+      ]
+    },
+    "tasks": {
+      "file": "tasks.csv",
+      "id": "task_id",
+      "prefix": "T-",
+      "title": "Исследовательские задачи (ResearchTask)",
+      "fields": [
+        {"name": "task_id"},
+        {"name": "hypothesis_id", "type": "ref", "ref": "hypotheses"},
+        {"name": "goal", "required": true},
+        {"name": "expected_result"},
+        {"name": "sources_to_check"},
+        {"name": "assignee", "doc": "Роль или человек"},
+        {"name": "priority", "type": "int", "doc": "1 — самый высокий"},
+        {"name": "status", "type": "enum", "required": true, "enum": ["planned", "ready", "in-progress", "blocked", "in-review", "completed", "closed-without-finding"]},
+        {"name": "constraints", "doc": "Стоимость, доступ, согласие пользователя"},
+        {"name": "search_ids", "type": "refs", "ref": "searches", "doc": "История попыток"},
+        {"name": "evidence_artifact_ids", "type": "refs", "ref": "artifacts"},
+        {"name": "close_reason"},
+        {"name": "next_step"}
+      ]
+    },
+    "searches": {
+      "file": "searches.csv",
+      "id": "search_id",
+      "prefix": "S-",
+      "title": "Журнал поиска, включая отрицательные результаты",
+      "fields": [
+        {"name": "search_id"},
+        {"name": "date", "type": "date", "required": true},
+        {"name": "task_id", "type": "ref", "ref": "tasks"},
+        {"name": "target_person_ids", "type": "refs", "ref": "persons"},
+        {"name": "source", "required": true, "doc": "Где искали (архив, база, сайт)"},
+        {"name": "query", "doc": "Что именно искали"},
+        {"name": "variants", "doc": "Варианты написания и поиска"},
+        {"name": "period", "type": "date", "doc": "Охваченный период, напр. 1880/1890"},
+        {"name": "source_limits", "doc": "Ограничения источника (неполнота, утраты)"},
+        {"name": "result", "type": "enum", "required": true, "enum": ["found", "not-found", "partial", "blocked", "error"]},
+        {"name": "artifact_ids", "type": "refs", "ref": "artifacts"},
+        {"name": "allowed_conclusions"},
+        {"name": "disallowed_conclusions"},
+        {"name": "repeat_when", "doc": "При каких условиях повторить"},
+        {"name": "next_step"}
+      ]
+    }
+  }
+}

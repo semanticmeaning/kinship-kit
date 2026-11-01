@@ -42,4 +42,9 @@ if [ "$BASE" = "$HOME" ]; then
   echo "✓ $HOME/.local/bin/kin"
   case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) echo "  добавьте ~/.local/bin в PATH" ;; esac
 fi
-echo "Готово. Проверка: kin --version; новое дело: kin init ~/kinship-cases/<имя>"
+echo "Готово. Первый шаг — kin setup (фамилия, название дела, автор коммитов)."
+if [ "$BASE" = "$HOME" ] && [ -t 0 ] && [ -t 1 ]; then
+  printf "Запустить kin setup сейчас? [да/нет] "
+  read -r answer || answer=""
+  case "$answer" in д*|Д*|y*|Y*) exec "$HOME/.local/bin/kin" setup ;; esac
+fi

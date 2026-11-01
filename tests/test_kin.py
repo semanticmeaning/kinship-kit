@@ -180,6 +180,13 @@ class TestEvidence(Base):
         self.assertEqual(Case(self.case).index("persons")[p2]["status"], "candidate")
         # с основанием — слияние, исходные записи сохраняются
         self.kin("update", "C-0001", "status=corroborated", "rationale=две независимые группы")
+        # слияние — значимый вывод: нужно независимое ревью identity-утверждения
+        self.assertIn("ревью", self.kin("person", "merge", p2, p1, ok=False).stderr)
+        self.kin("review", "request", "C-0001")
+        self.kin("review", "submit", "V-0001", "--verdict", "passed", "--checked", f"{a1};{a2}",
+                 "--findings", "Обе записи прочитаны", "--as", "Evidence Reviewer")
+        self.assertIn("решение человека", self.kin("person", "merge", p2, p1, ok=False).stderr)  # P-2 возможно жив
+        self.kin("review", "decide", "V-0001", "--by", "Тестовый Пользователь")
         self.kin("person", "merge", p2, p1)
         case = Case(self.case)
         self.assertEqual(case.resolve_person(p2), p1)

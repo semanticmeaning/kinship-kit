@@ -1,0 +1,66 @@
+# Выкладка сайта-схемы
+
+`kin` ничего сам не отправляет в сеть: `kin site publish` собирает сайт с аудитом, фильтром приватности и проверкой
+утечек и копирует его в указанную папку. Дальше её раздаёт веб-сервер. Публикация — только с согласия владельца дела.
+
+## Профили
+
+| Профиль | Кому | Где |
+|---|---|---|
+| `public` | всем | любой статический хостинг, GitHub Pages; живые и «возможно живые» скрыты |
+| `private` | семье | **только за паролем** (`--password-protected` — ваше подтверждение) или локально `kin site serve` |
+
+## Сервер: Caddy + пароль + защита от перебора
+
+```bash
+kin site publish --profile private --to /var/www/family-tree --password-protected
+caddy hash-password            # получить хеш пароля
+```
+
+`/etc/caddy/Caddyfile`:
+```
+tree.example.org {
+    root * /var/www/family-tree
+    file_server
+    basic_auth {
+        family <ХЕШ_ПАРОЛЯ>
+    }
+    header X-Robots-Tag "noindex, nofollow"
+    log {
+        output file /var/log/caddy/tree.log
+    }
+}
+```
+
+fail2ban — бан после повторных 401 (`/etc/fail2ban/filter.d/caddy-auth.conf`):
+```
+[Definition]
+failregex = ^.*"remote_ip":"<HOST>".*"status":401.*$
+```
+`/etc/fail2ban/jail.d/caddy-auth.conf`:
+```
+[caddy-auth]
+enabled  = true
+filter   = caddy-auth
+logpath  = /var/log/caddy/tree.log
+maxretry = 10
+findtime = 600
+bantime  = 86400
+```
+Проверьте выражение на своём журнале: `fail2ban-regex /var/log/caddy/tree.log caddy-auth`.
+
+## Автоматически после каждого коммита дела
+
+```bash
+kin hooks install --profile private --publish-to /var/www/family-tree
+```
+Хук пересобирает сайт и копирует его; журнал — `.kin/hook.log`. При ошибке аудита или утечке сайт не обновляется.
+
+## Публичная версия: GitHub Pages или любой статический хостинг
+
+```bash
+kin site publish --profile public --to ~/tree-public --dry-run   # что уйдёт
+kin site publish --profile public --to ~/tree-public
+```
+Папку `~/tree-public` можно положить в отдельный репозиторий с включённым GitHub Pages. Это **не** репозиторий дела
+и не репозиторий набора. Перед первой публикацией — проверка ролью Security & Privacy Reviewer и решение человека.
