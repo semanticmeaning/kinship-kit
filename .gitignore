@@ -2,3 +2,9 @@ work/
 .venv/
 __pycache__/
 *.pyc
+# дела и сборки никогда не хранятся в наборе (дополнительно проверяет tools/check_repo.py)
+case.json
+journal.jsonl
+site/
+publish/
+.kin/

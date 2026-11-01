@@ -1,0 +1,3 @@
+#!/bin/sh
+# Обёртка для разработки: kin из этого репозитория
+exec python3 "$(dirname "$(readlink -f "$0")")/../skills/kinship-kit/kin.py" "$@"

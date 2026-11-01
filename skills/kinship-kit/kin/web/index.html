@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Схема рода</title>
+<style>
+:root{
+  --bg:#f6f4ef;--panel:#fffdf8;--ink:#23201b;--muted:#6f685c;--line:#cfc6b6;--edge:#8a7f6d;
+  --card:#fffdf8;--card-b:#d9cfbd;--accent:#7a4b1d;--chip:#efe8db;
+  --ok:#2f6b3a;--warn:#9a6a00;--bad:#9b2c2c;--hyp:#5a4a8a;--fam:#6f685c;
+  --shadow:0 1px 2px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#191714;--panel:#221f1b;--ink:#ece6da;--muted:#a59d8f;--line:#4a443b;--edge:#9a8f7c;
+  --card:#25221d;--card-b:#4a443b;--accent:#e0a868;--chip:#332e27;
+  --ok:#7fc48b;--warn:#e2b04a;--bad:#e58a8a;--hyp:#b2a2ea;--fam:#a59d8f;--shadow:none}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--ink);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.01em}
+.badge{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--chip);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.badge.public{background:var(--ok);color:var(--panel)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-left:auto}
+input[type=search]{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:180px}
+button,select{font:inherit;padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--edge)}
+label.tg{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:13px;cursor:pointer}
+main{display:flex;flex:1;min-height:0}
+#wrap{flex:1;overflow:auto;position:relative}
+#stage{position:relative;transform-origin:0 0}
+svg#edges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.gen-label{position:absolute;left:12px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+.gen-band{position:absolute;left:0;right:0;border-top:1px dashed var(--line)}
+.card{position:absolute;width:176px;min-height:64px;padding:7px 9px 8px;border:1px solid var(--card-b);border-left:4px solid var(--lc,var(--card-b));
+  border-radius:9px;background:var(--card);box-shadow:var(--shadow);cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}
+.card:hover{transform:translateY(-1px)}
+.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card.sel{outline:2px solid var(--accent)}
+.card.dim{opacity:.25}
+.card .nm{font-weight:600;font-size:13px;line-height:1.25}
+.card .dt{font-size:12px;color:var(--muted);margin-top:2px}
+.card .st{font-size:10.5px;margin-top:4px;color:var(--muted);text-transform:lowercase}
+.card.s-candidate{border-style:dashed;background:transparent}
+.card.s-hypothesis{border-style:dashed;border-color:var(--hyp)}
+.card.s-family-reported,.card.s-tree-entry-unverified{border-style:dotted}
+.card.s-unlikely{opacity:.5;text-decoration:line-through}
+.card.root{box-shadow:0 0 0 2px var(--accent)}
+.card .liv{font-size:10.5px;color:var(--warn)}
+#unplaced{position:absolute;left:12px}
+aside{width:min(420px,92vw);border-left:1px solid var(--line);background:var(--panel);overflow:auto;padding:14px 16px 40px;display:none}
+aside.open{display:block}
+aside h2{font-size:17px;margin:0 0 4px}
+aside h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:18px 0 6px}
+.close{float:right}
+.chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;background:var(--chip);margin-right:4px;white-space:nowrap}
+.chip.corroborated,.chip.strongly-corroborated{background:var(--ok);color:var(--panel)}
+.chip.single-source{background:var(--chip);color:var(--ink)}
+.chip.hypothesis{background:var(--hyp);color:var(--panel)}
+.chip.contradicted,.chip.unresolved{background:var(--warn);color:var(--panel)}
+.chip.rejected,.chip.superseded{background:var(--bad);color:var(--panel)}
+.claim{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;background:var(--bg)}
+.claim .meta{font-size:12px;color:var(--muted);margin-top:4px}
+.claim .src{font-size:12px;margin-top:4px}
+.claim .against{color:var(--bad)}
+.claim .compete{color:var(--warn);font-size:12px;margin-top:4px}
+.muted{color:var(--muted)}
+a{color:var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);padding:6px 16px;border-bottom:1px solid var(--line)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{display:inline-block;width:22px;height:0;border-top:2px solid var(--edge)}
+.sw.d{border-top-style:dashed;border-color:var(--hyp)}.sw.o{border-top-style:dotted}
+.empty{padding:40px;color:var(--muted)}
+@media (max-width:700px){aside{position:fixed;right:0;top:0;bottom:0;z-index:9;width:100%}}
+@media (prefers-reduced-motion:reduce){.card{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">…</h1><span id="profile" class="badge"></span>
+  <div class="tools">
+    <input id="q" type="search" placeholder="Поиск по имени" aria-label="Поиск">
+    <label class="tg"><input id="showUnlikely" type="checkbox"> <span data-i="showRejected">отброшенные</span></label>
+    <button id="zoomOut" aria-label="−">−</button><button id="zoomIn" aria-label="+">+</button>
+    <button id="lang">EN</button>
+  </div>
+</header>
+<div class="legend" id="legend"></div>
+<main>
+  <div id="wrap"><div id="stage"><svg id="edges"></svg></div></div>
+  <aside id="panel" aria-live="polite"></aside>
+</main>
+<script>
+"use strict";
+const I18N = {
+  ru:{gen:{0:"Поколение корня","-1":"Родители","-2":"Деды и бабушки","-3":"Прадеды","-4":"Прапрадеды","-5":"5-е колено вверх","-6":"6-е колено вверх",1:"Дети",2:"Внуки",3:"Правнуки"},
+      genN:n=>n<0?`${-n}-е колено вверх`:`${n}-е колено вниз`, unplaced:"Вне схемы (колено не установлено)",
+      showRejected:"отброшенные", search:"Поиск по имени", close:"Закрыть", claims:"Утверждения", rels:"Связи",
+      sources:"Источники", against:"против", competing:"конкурирующая версия", hyps:"Гипотезы", variants:"Варианты имени",
+      places:"Места", noClaims:"Утверждений нет", living:"жив(а)", unknownLiving:"статус жизни неизвестен",
+      parentOf:"родитель", childOf:"ребёнок", spouse:"супруг(а)", sibling:"брат/сестра", other:"связь",
+      private:"приватная сборка", public:"публичная сборка", empty:"В публикационном наборе нет людей.",
+      legend:{edge:"родство по источнику",hyp:"гипотеза",ident:"возможно одно лицо",cand:"кандидат (родство не установлено)",fam:"со слов семьи / из древа"},
+      st:{"tree-entry-unverified":"из древа, не проверено","family-reported":"со слов семьи",candidate:"кандидат","identity-probable":"личность вероятна","identity-confirmed":"личность подтверждена",hypothesis:"гипотеза",unlikely:"отброшен"},
+      cs:{hypothesis:"гипотеза","single-source":"один источник",corroborated:"подтверждено","strongly-corroborated":"надёжно подтверждено",contradicted:"противоречие",unresolved:"не решено",rejected:"отвергнуто",superseded:"заменено"},
+      hidden:n=>`скрыто людей: ${n}`},
+  en:{gen:{0:"Root generation","-1":"Parents","-2":"Grandparents","-3":"Great-grandparents","-4":"2× great-grandparents",1:"Children",2:"Grandchildren",3:"Great-grandchildren"},
+      genN:n=>n<0?`${-n} generations up`:`${n} generations down`, unplaced:"Not placed (generation unknown)",
+      showRejected:"rejected", search:"Search by name", close:"Close", claims:"Claims", rels:"Relationships",
+      sources:"Sources", against:"against", competing:"competing version", hyps:"Hypotheses", variants:"Name variants",
+      places:"Places", noClaims:"No claims", living:"living", unknownLiving:"living status unknown",
+      parentOf:"parent", childOf:"child", spouse:"spouse", sibling:"sibling", other:"relation",
+      private:"private build", public:"public build", empty:"No people in the publication dataset.",
+      legend:{edge:"kinship stated in a source",hyp:"hypothesis",ident:"possibly the same person",cand:"candidate (kinship not established)",fam:"family-reported / from a tree"},
+      st:{"tree-entry-unverified":"tree entry, unverified","family-reported":"family-reported",candidate:"candidate","identity-probable":"identity probable","identity-confirmed":"identity confirmed",hypothesis:"hypothesis",unlikely:"rejected"},
+      cs:{hypothesis:"hypothesis","single-source":"single source",corroborated:"corroborated","strongly-corroborated":"strongly corroborated",contradicted:"contradicted",unresolved:"unresolved",rejected:"rejected",superseded:"superseded"},
+      hidden:n=>`hidden people: ${n}`}
+};
+const W=176, GAP=22, ROW=150, TOP=36, LEFT=150;
+let D, L, lang, zoom=1, selected=null;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+fetch("tree.json",{cache:"no-store"}).then(r=>r.json()).then(d=>{D=d;
+  lang=store.get("kin-lang")||(d.meta.language==="en"?"en":"ru"); init();}).catch(e=>{
+  document.body.insertAdjacentHTML("beforeend",`<p class="empty">tree.json: ${esc(e.message)}</p>`)});
+
+function init(){
+  D.byId=Object.fromEntries(D.persons.map(p=>[p.id,p]));
+  D.src=Object.fromEntries(D.sources.map(s=>[s.id,s]));
+  D.claimById=Object.fromEntries(D.claims.map(c=>[c.id,c]));
+  D.lineById=Object.fromEntries((D.meta.lines||[]).map(l=>[l.id,l]));
+  $("#q").addEventListener("input",highlight);
+  $("#showUnlikely").checked=store.get("kin-unlikely")==="1";
+  $("#showUnlikely").addEventListener("change",e=>{store.set("kin-unlikely",e.target.checked?"1":"0");render()});
+  $("#zoomIn").onclick=()=>setZoom(zoom*1.15); $("#zoomOut").onclick=()=>setZoom(zoom/1.15);
+  $("#lang").onclick=()=>{lang=lang==="ru"?"en":"ru";store.set("kin-lang",lang);render()};
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closePanel()});
+  const h=decodeURIComponent(location.hash.slice(1)); if(D.byId[h])selected=h;
+  window.addEventListener("hashchange",()=>{const id=decodeURIComponent(location.hash.slice(1)); if(D.byId[id])open(id)});
+  render();
+}
+function setZoom(z){zoom=Math.min(2,Math.max(.4,z));$("#stage").style.transform=`scale(${zoom})`;}
+
+function genName(g){return L.gen[g]??L.genN(g)}
+function visiblePersons(){const u=$("#showUnlikely").checked;return D.persons.filter(p=>u||p.status!=="unlikely")}
+
+function layout(people){
+  const ids=new Set(people.map(p=>p.id)), rows=new Map(), unplaced=[];
+  for(const p of people){ if(p.gen===null||p.gen===undefined){unplaced.push(p);continue}
+    if(!rows.has(p.gen))rows.set(p.gen,[]); rows.get(p.gen).push(p);}
+  const gens=[...rows.keys()].sort((a,b)=>a-b);
+  const parents={},children={},spouses={};
+  for(const r of D.relationships){ if(!ids.has(r.a)||!ids.has(r.b))continue;
+    if(r.type==="parent-of"){(children[r.a]??=[]).push(r.b);(parents[r.b]??=[]).push(r.a)}
+    if(r.type==="spouse-of"){(spouses[r.a]??=[]).push(r.b);(spouses[r.b]??=[]).push(r.a)}}
+  // гипотезы родства из утверждений тоже участвуют в раскладке (первый subject в parentage — родитель)
+  for(const c of D.claims){ if(c.type!=="parentage"||c.status!=="hypothesis"||c.subjects.length<2)continue; const [a,b]=c.subjects;
+    if(ids.has(a)&&ids.has(b)){(children[a]??=[]).push(b);(parents[b]??=[]).push(a)}}
+  // «возможно одно лицо» — тоже рядом, чтобы точечная линия не пересекала чужие карточки
+  for(const c of D.claims){ if(c.type!=="identity"||c.subjects.length<2)continue; const [a,b]=c.subjects;
+    if(ids.has(a)&&ids.has(b)){(spouses[a]??=[]).push(b);(spouses[b]??=[]).push(a)}}
+  const by=p=>parseInt(p.birth)||9999, x={};
+  for(const g of gens){rows.get(g).sort((a,b)=>by(a)-by(b)||a.id.localeCompare(b.id)).forEach((p,i)=>x[p.id]=i)}
+  const avg=(arr)=>{const v=(arr||[]).filter(i=>i in x).map(i=>x[i]);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
+  for(let pass=0;pass<4;pass++){
+    const seq=pass%2?gens:[...gens].reverse();
+    for(const g of seq){const row=rows.get(g);
+      row.forEach(p=>{const a=avg(pass%2?parents[p.id]:children[p.id]);
+        const linked=parents[p.id]||children[p.id]; p._k=a!==null?a:(linked?x[p.id]:1e6+x[p.id])});
+      row.sort((a,b)=>a._k-b._k); groupSpouses(row,spouses); row.forEach((p,i)=>x[p.id]=i);}}
+  const pos={}; let maxW=0;
+  gens.forEach((g,gi)=>{const row=rows.get(g);
+    // центрируем ряд под средним положением родителей, без наложений
+    let cursor=LEFT;
+    row.forEach(p=>{let want=cursor; const px=parents[p.id]?.filter(i=>pos[i]);
+      if(px&&px.length) want=px.reduce((s,i)=>s+pos[i].x,0)/px.length;
+      const left=Math.max(cursor,want); pos[p.id]={x:left,y:TOP+gi*ROW}; cursor=left+W+GAP;});
+    maxW=Math.max(maxW,cursor);});
+  const uy=TOP+gens.length*ROW+30; let ux=LEFT;
+  unplaced.sort((a,b)=>(a.line||"").localeCompare(b.line||"")||by(a)-by(b)).forEach((p,i)=>{
+    pos[p.id]={x:ux,y:uy+28}; ux+=W+GAP; if(ux>Math.max(maxW,1200)){ux=LEFT;}});
+  return {gens,pos,unplaced,uy,width:Math.max(maxW,ux)+40,height:uy+(unplaced.length?ROW+60:0)};
+}
+function groupSpouses(row,spouses){
+  const seen=new Set(),out=[];
+  for(const p of row){ if(seen.has(p.id))continue; out.push(p);seen.add(p.id);
+    for(const s of spouses[p.id]||[]){const q=row.find(r=>r.id===s); if(q&&!seen.has(q.id)){out.push(q);seen.add(q.id)}}}
+  row.splice(0,row.length,...out);
+}
+
+function render(){
+  L=I18N[lang]; document.documentElement.lang=lang; $("#lang").textContent=lang==="ru"?"EN":"RU";
+  document.title=D.meta.title||"Kinship";
+  $("#title").textContent=D.meta.title; $("#q").placeholder=L.search;
+  $("#profile").textContent=L[D.meta.profile]+(D.meta.hidden_persons?` · ${L.hidden(D.meta.hidden_persons)}`:"");
+  $("#profile").className="badge "+D.meta.profile;
+  document.querySelectorAll("[data-i]").forEach(e=>e.textContent=L[e.dataset.i]);
+  $("#legend").innerHTML=`<span><i class="sw"></i>${L.legend.edge}</span><span><i class="sw d"></i>${L.legend.hyp}</span>
+    <span><i class="sw o"></i>${L.legend.ident}</span>`+
+    (D.meta.lines||[]).map(l=>`<span><i class="sw" style="border-color:${esc(l.color||"var(--edge)")};border-top-width:4px"></i>${esc(l.title)}${l.state?` — ${esc(l.state)}`:""}</span>`).join("");
+  const stage=$("#stage"); stage.querySelectorAll(".card,.gen-label,.gen-band").forEach(e=>e.remove());
+  const people=visiblePersons();
+  if(!people.length){stage.insertAdjacentHTML("beforeend",`<p class="empty gen-label" style="top:20px">${L.empty}</p>`);return}
+  const lay=layout(people); D.lay=lay;
+  lay.gens.forEach((g,i)=>{stage.insertAdjacentHTML("beforeend",
+    `<div class="gen-band" style="top:${TOP+i*ROW-14}px"></div><div class="gen-label" style="top:${TOP+i*ROW-10}px">${esc(genName(g))}</div>`)});
+  if(lay.unplaced.length)stage.insertAdjacentHTML("beforeend",
+    `<div class="gen-band" style="top:${lay.uy}px"></div><div class="gen-label" style="top:${lay.uy+6}px">${L.unplaced}</div>`);
+  for(const p of people){const {x,y}=lay.pos[p.id]; const ln=D.lineById[p.line];
+    const d=[p.birth_h&&("* "+p.birth_h),p.death_h&&("† "+p.death_h)].filter(Boolean).join("  ");
+    const liv=p.living==="living"?`<div class="liv">${L.living}</div>`:"";
+    stage.insertAdjacentHTML("beforeend",`<div class="card s-${esc(p.status)}${p.id===D.meta.root?" root":""}${p.id===selected?" sel":""}" tabindex="0" role="button"
+      data-id="${esc(p.id)}" style="left:${x}px;top:${y}px;${ln&&ln.color?`--lc:${esc(ln.color)}`:""}">
+      <div class="nm">${esc(p.label)}</div><div class="dt">${esc(d)}</div>${liv}<div class="st">${esc(L.st[p.status]||p.status)}</div></div>`);}
+  stage.querySelectorAll(".card").forEach(c=>{c.onclick=()=>open(c.dataset.id);
+    c.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open(c.dataset.id)}}});
+  drawEdges(people,lay); stage.style.width=lay.width+"px"; stage.style.height=lay.height+"px"; setZoom(zoom); highlight();
+  if(selected&&D.byId[selected])open(selected,!!D.opened); D.opened=true;
+}
+
+function drawEdges(people,lay){
+  const ids=new Set(people.map(p=>p.id)), pos=lay.pos, svg=$("#edges");
+  svg.setAttribute("width",lay.width); svg.setAttribute("height",lay.height);
+  const H=64, parts=[], hyp=s=>s==="hypothesis";
+  const cand=id=>["candidate","hypothesis"].includes(D.byId[id]?.status);
+  const line=(x1,y1,x2,y2,cls)=>parts.push(`<path d="M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}" ${cls}/>`);
+  const style={solid:`fill="none" stroke="var(--edge)" stroke-width="1.4"`,dash:`fill="none" stroke="var(--hyp)" stroke-width="1.4" stroke-dasharray="6 4"`,
+    dot:`fill="none" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="2 4"`};
+  for(const r of D.relationships){ if(!ids.has(r.a)||!ids.has(r.b)||r.status==="rejected"||r.status==="superseded")continue;
+    const a=pos[r.a],b=pos[r.b]; const st=(hyp(r.status)||cand(r.a)||cand(r.b))?style.dash:style.solid;
+    if(r.type==="parent-of") line(a.x+W/2,a.y+H,b.x+W/2,b.y,st);
+    else{const [l,rr]=a.x<b.x?[a,b]:[b,a]; const y=l.y+H/2;
+      parts.push(`<path d="M${l.x+W},${y} L${rr.x},${rr.y+H/2}" ${st}/>`);
+      if(r.type==="spouse-of"){const cx=(l.x+W+rr.x)/2;
+        parts.push(`<circle cx="${cx-3}" cy="${y-9}" r="4.5" fill="none" stroke="var(--edge)" stroke-width="1.3"/><circle cx="${cx+3}" cy="${y-9}" r="4.5" fill="none" stroke="var(--edge)" stroke-width="1.3"/>`)}}}
+  // гипотезы и тождества из утверждений (между двумя людьми)
+  for(const c of D.claims){ if(!["parentage","sibling","kinship","identity"].includes(c.type)||c.subjects.length<2)continue;
+    if(c.type!=="identity"&&c.status!=="hypothesis")continue;
+    const [p,q]=c.subjects; if(!ids.has(p)||!ids.has(q))continue; const a=pos[p],b=pos[q];
+    const st=c.type==="identity"?style.dot:style.dash;
+    if(a.y===b.y){const [l,rr]=a.x<b.x?[a,b]:[b,a]; parts.push(`<path d="M${l.x+W},${l.y+H/2} L${rr.x},${rr.y+H/2}" ${st}/>`)}
+    else{const [u,d]=a.y<b.y?[a,b]:[b,a]; line(u.x+W/2,u.y+H,d.x+W/2,d.y,st)}}
+  svg.innerHTML=parts.join("");
+}
+
+function highlight(){
+  const q=$("#q").value.trim().toLowerCase();
+  document.querySelectorAll(".card").forEach(c=>{const p=D.byId[c.dataset.id];
+    const hay=[p.label,...(p.variants||[])].join(" ").toLowerCase(); c.classList.toggle("dim",!!q&&!hay.includes(q))});
+}
+
+function srcLine(id){const s=D.src[id]; if(!s)return esc(id);
+  const ref=[s.repository,s.reference].filter(Boolean).join(", ");
+  const t=`${esc(s.id)} — ${esc(s.title)}${ref?` (${esc(ref)})`:""}`;
+  return s.url&&/^https?:/.test(s.url)?`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${t}</a>`:t;}
+function chip(st){return `<span class="chip ${esc(st)}">${esc(L.cs[st]||st)}</span>`}
+
+function open(id,keep){
+  selected=id; const p=D.byId[id]; if(!p)return;
+  if(location.hash!=="#"+id)history.replaceState(null,"","#"+id);
+  document.querySelectorAll(".card").forEach(c=>c.classList.toggle("sel",c.dataset.id===id));
+  const name=i=>D.byId[i]?`<a href="#" data-go="${esc(i)}">${esc(D.byId[i].label)}</a>`:esc(i);
+  const claims=D.claims.filter(c=>c.subjects.includes(id));
+  const rels=D.relationships.filter(r=>r.a===id||r.b===id).map(r=>{
+    const other=r.a===id?r.b:r.a; let role=L.other;
+    if(r.type==="parent-of")role=r.a===id?L.parentOf:L.childOf; if(r.type==="spouse-of")role=L.spouse; if(r.type==="sibling-of")role=L.sibling;
+    const who=r.type==="parent-of"?(r.a===id?L.childOf:L.parentOf):role;
+    return `<div class="claim">${who}: ${name(other)} ${chip(r.status)}${r.sources.length?`<div class="src">${L.sources}: ${r.sources.map(srcLine).join("; ")}</div>`:""}${r.rationale?`<div class="meta">${esc(r.rationale)}</div>`:""}</div>`}).join("");
+  const hy=(D.hypotheses||[]).filter(h=>h.persons.includes(id)).map(h=>`<div class="claim">${chip("hypothesis")} ${esc(h.statement)}</div>`).join("");
+  const life=p.living==="living"?L.living:(p.living==="unknown"?L.unknownLiving:"");
+  $("#panel").innerHTML=`<button class="close" aria-label="${L.close}">✕</button><h2>${esc(p.label)}</h2>
+    <div class="muted">${esc([p.birth_h&&"* "+p.birth_h,p.death_h&&"† "+p.death_h,life].filter(Boolean).join(" · "))}</div>
+    <div style="margin-top:6px"><span class="chip">${esc(L.st[p.status]||p.status)}</span><span class="chip">${esc(p.id)}</span></div>
+    ${p.variants.length?`<h3>${L.variants}</h3>${p.variants.map(esc).join("; ")}`:""}
+    ${p.places.length?`<h3>${L.places}</h3>${p.places.map(esc).join("; ")}`:""}
+    <h3>${L.claims}</h3>${claims.map(c=>`<div class="claim">${chip(c.status)} ${esc(c.statement)}
+      <div class="meta">${esc([c.date_h,c.place].filter(Boolean).join(" · "))}${c.rationale?` — ${esc(c.rationale)}`:""}</div>
+      ${c.sources.length?`<div class="src">${L.sources}: ${c.sources.map(srcLine).join("; ")}</div>`:""}
+      ${c.against.length?`<div class="src against">${L.against}: ${c.against.map(srcLine).join("; ")}</div>`:""}
+      ${c.competing.length?`<div class="compete">↔ ${L.competing}: ${c.competing.map(i=>esc(i+" "+(D.claimById[i]?.date_h||""))).join("; ")}</div>`:""}
+      </div>`).join("")||`<div class="muted">${L.noClaims}</div>`}
+    ${rels?`<h3>${L.rels}</h3>${rels}`:""}${hy?`<h3>${L.hyps}</h3>${hy}`:""}`;
+  $("#panel").classList.add("open");
+  $("#panel .close").onclick=closePanel;
+  $("#panel").querySelectorAll("[data-go]").forEach(a=>a.onclick=e=>{e.preventDefault();open(a.dataset.go)});
+  if(!keep){const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);c&&c.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"})}
+}
+function closePanel(){selected=null;history.replaceState(null,"",location.pathname+location.search);$("#panel").classList.remove("open");document.querySelectorAll(".card.sel").forEach(c=>c.classList.remove("sel"))}
+</script>
+</body>
+</html>

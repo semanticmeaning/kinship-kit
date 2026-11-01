@@ -1,0 +1,120 @@
+"""Восстановление состояния исследования из данных дела (а не из контекста чата).
+
+Отвечает на вопросы нового сеанса: какие гипотезы активны, какие задачи шли, что проверено и пусто,
+что заблокировано, что делать дальше.
+"""
+from __future__ import annotations
+
+import json
+
+from . import audit
+from .store import Case, split_ids
+
+ACTIVE_H = ("open", "testing")
+TASK_ORDER = ("in-progress", "in-review", "blocked", "ready", "planned")
+
+
+def _prio(t: dict) -> int:
+    try:
+        return int(t.get("priority") or 9)
+    except ValueError:
+        return 9
+
+
+def _journal_tail(case: Case, n: int) -> list[dict]:
+    p = case.root / "journal.jsonl"
+    if not p.is_file():
+        return []
+    lines = p.read_text(encoding="utf-8").splitlines()[-n:]
+    out = []
+    for line in lines:
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out
+
+
+def collect(case: Case) -> dict:
+    a = audit.run(case)
+    hyps = [h for h in case.rows("hypotheses") if h["status"] in ACTIVE_H]
+    tasks = case.rows("tasks")
+    by_status = {s: sorted((t for t in tasks if t["status"] == s), key=_prio) for s in TASK_ORDER}
+    negative = [s for s in case.rows("searches") if s["result"] in ("not-found", "blocked", "error", "partial")]
+    open_claims = [c for c in case.rows("claims") if c["status"] in ("unresolved", "contradicted")]
+    tasks_by_h = {}
+    for t in tasks:
+        if t.get("hypothesis_id"):
+            tasks_by_h.setdefault(t["hypothesis_id"], []).append(t["task_id"])
+
+    nxt = None
+    if a["errors"]:
+        nxt = {"kind": "fix-audit", "text": f"Исправить ошибки аудита ({len(a['errors'])}): kin audit"}
+    elif by_status["in-progress"]:
+        t = by_status["in-progress"][0]
+        nxt = {"kind": "continue-task", "id": t["task_id"], "text": f"Продолжить {t['task_id']}: {t['goal']}"}
+    elif by_status["in-review"]:
+        t = by_status["in-review"][0]
+        nxt = {"kind": "review", "id": t["task_id"], "text": f"Независимое ревью {t['task_id']}: {t['goal']}"}
+    elif by_status["ready"]:
+        t = by_status["ready"][0]
+        nxt = {"kind": "start-task", "id": t["task_id"], "text": f"Начать {t['task_id']} (приоритет {t.get('priority') or '—'}): {t['goal']}"}
+    else:
+        orphan = [h for h in hyps if h["hypothesis_id"] not in tasks_by_h]
+        if orphan:
+            h = orphan[0]
+            nxt = {"kind": "plan-task", "id": h["hypothesis_id"], "text": f"Поставить задачу для {h['hypothesis_id']}: {h['statement']}"}
+        elif open_claims:
+            c = open_claims[0]
+            nxt = {"kind": "resolve-claim", "id": c["claim_id"], "text": f"Разобрать противоречие {c['claim_id']}: {c['statement']}"}
+    return {
+        "case": case.config.get("title", ""),
+        "path": str(case.root),
+        "counts": a["counts"],
+        "audit": {"errors": len(a["errors"]), "warnings": len(a["warnings"])},
+        "active_hypotheses": [{"id": h["hypothesis_id"], "status": h["status"], "statement": h["statement"],
+                               "tasks": tasks_by_h.get(h["hypothesis_id"], [])} for h in hyps],
+        "tasks": {s: [{"id": t["task_id"], "goal": t["goal"], "priority": t.get("priority", ""),
+                       "assignee": t.get("assignee", ""), "constraints": t.get("constraints", ""),
+                       "next_step": t.get("next_step", "")} for t in by_status[s]] for s in TASK_ORDER},
+        "checked_negative": [{"id": s["search_id"], "date": s["date"], "source": s["source"], "query": s.get("query", ""),
+                              "period": s.get("period", ""), "result": s["result"],
+                              "repeat_when": s.get("repeat_when", ""),
+                              "persons": split_ids(s.get("target_person_ids"))} for s in negative],
+        "open_contradictions": [{"id": c["claim_id"], "statement": c["statement"]} for c in open_claims],
+        "recent_changes": [{"ts": j.get("ts"), "actor": j.get("actor"), "op": j.get("op"), "id": j.get("id")}
+                           for j in _journal_tail(case, 8)],
+        "next": nxt,
+    }
+
+
+def format_text(s: dict) -> str:
+    out = [f"Дело: {s['case']}  ({s['path']})",
+           "Записей: " + ", ".join(f"{k}={v}" for k, v in s["counts"].items() if v),
+           f"Аудит: ошибок {s['audit']['errors']}, предупреждений {s['audit']['warnings']}"]
+    if s["next"]:
+        out.append(f"\n▶ СЛЕДУЮЩИЙ ШАГ: {s['next']['text']}")
+    out.append(f"\nАктивные гипотезы ({len(s['active_hypotheses'])}):")
+    out += [f"- {h['id']} [{h['status']}] {h['statement']}" + (f"  → задачи {', '.join(h['tasks'])}" if h['tasks'] else "  → задач нет")
+            for h in s["active_hypotheses"]] or ["- нет"]
+    labels = {"in-progress": "В работе", "in-review": "На ревью", "blocked": "Заблокировано",
+              "ready": "Готово к старту", "planned": "Запланировано"}
+    for key, label in labels.items():
+        items = s["tasks"][key]
+        if items:
+            out.append(f"\n{label} ({len(items)}):")
+            for t in items:
+                extra = f" — {t['constraints']}" if key == "blocked" and t["constraints"] else ""
+                out.append(f"- {t['id']} [p{t['priority'] or '—'}] {t['goal']}{extra}")
+    if s["checked_negative"]:
+        out.append(f"\nПроверено без результата ({len(s['checked_negative'])}) — не повторять без нового основания:")
+        for n in s["checked_negative"]:
+            rep = f"; повторить, если: {n['repeat_when']}" if n["repeat_when"] else ""
+            out.append(f"- {n['id']} {n['date']} {n['source']}: {n['query']} [{n['period']}] → {n['result']}{rep}")
+    if s["open_contradictions"]:
+        out.append(f"\nНерешённые противоречия ({len(s['open_contradictions'])}):")
+        out += [f"- {c['id']} {c['statement']}" for c in s["open_contradictions"]]
+    if s["recent_changes"]:
+        out.append("\nПоследние изменения:")
+        out += [f"- {j['ts']} {j['actor']}: {j['op']} {j['id']}" for j in s["recent_changes"]]
+    return "\n".join(out)
