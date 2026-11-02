@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from helpers import REPO, Base, demo, run, unlock  # noqa: E402
@@ -204,17 +206,19 @@ class TestLayoutCheck(Base):
         from kin import site as site_mod
         self.person("Ветлугин Сергей")
         marker = Path(self.tmp.name) / "marker.txt"
+        # путь — из окружения, не из текста страницы: локальный путь в странице остановила бы проверка утечек
         probe = ("(process.getBuiltinModule ? process.getBuiltinModule('fs') : process.mainModule.require('fs'))"
-                 f".writeFileSync({json.dumps(str(marker))}, 'x');")
+                 ".writeFileSync(process.env.KIN_TEST_MARKER, 'x');")
         theme = self.case / "theme"
         theme.mkdir()
         page = (site_mod.WEB / "index.html").read_text(encoding="utf-8").replace("<script>", "<script>" + probe, 1)
         (theme / "index.html").write_text(page, encoding="utf-8")
-        res = self.kin("site", "build")
-        self.assertFalse(marker.exists(), "скрипт страницы дела выполнился в node")
-        self.assertIn("theme/index.html", res.stderr)
-        # зонд рабочий: выполненная напрямую, такая страница создала бы файл
-        site_mod.check_layout(self.case / "site" / "private", page=theme / "index.html")
+        with mock.patch.dict(os.environ, {"KIN_TEST_MARKER": str(marker)}):
+            res = self.kin("site", "build")
+            self.assertFalse(marker.exists(), "скрипт страницы дела выполнился в node")
+            self.assertIn("theme/index.html", res.stderr)
+            # зонд рабочий: выполненная напрямую, такая страница создала бы файл
+            site_mod.check_layout(self.case / "site" / "private", page=theme / "index.html")
         self.assertTrue(marker.exists())
 
     def test_demo_layout(self):

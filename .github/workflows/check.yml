@@ -18,9 +18,8 @@ jobs:
       - run: sh tools/check.sh   # только синтетические данные; реальные дела в CI не передаются
       - run: pip install -e . && kin schema persons >/dev/null   # pyproject.toml: команда kin ставится и работает
   windows:
-    # пока для диагностики: показывает, что ломается в Windows, но не блокирует слияние
+    # все тесты в Windows (без ruff и проверки репозитория — они в задаче check)
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
