@@ -1,6 +1,6 @@
 # Приёмочные сценарии (раздел 21) — статус
 
-Проверки автоматизированы в `tests/test_kin.py`, `tests/test_stage2.py`, `tests/test_stage3.py` (запуск: `sh tools/check.sh`).
+Проверки автоматизированы в `tests/` (`test_core.py`, `test_workflow.py`, `test_exchange.py`, `test_site.py`, `test_services.py`, `test_downloaders.py`) (запуск: `sh tools/check.sh`).
 
 | № | Сценарий | Статус | Чем проверено |
 |---|---|---|---|

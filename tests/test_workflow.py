@@ -1,4 +1,4 @@
-"""Этап 2: setup, миграции, next, жизненный цикл задач и гипотез, ревью, поиск без повторов, роли, публикация."""
+"""Процесс исследования: setup, миграции, next, жизненный цикл задач и гипотез, ревью, поиск без повторов, роли, публикация."""
 from __future__ import annotations
 
 import csv
@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_kin import KIN, REPO, Base, run  # noqa: E402
+from helpers import KIN, REPO, Base, run  # noqa: E402
 
 sys.path.insert(0, str(REPO / "skills" / "kinship-kit"))
 from kin.store import Case  # noqa: E402
@@ -347,7 +347,7 @@ class TestSetup(unittest.TestCase):
             self.assertIn("автора", res.stderr)
 
 
-class TestDemoStage2(unittest.TestCase):
+class TestDemoWorkflow(unittest.TestCase):
     def test_demo_review_scenario(self):
         with tempfile.TemporaryDirectory() as tmp:
             case = Path(tmp) / "demo"

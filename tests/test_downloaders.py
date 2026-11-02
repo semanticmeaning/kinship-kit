@@ -15,7 +15,7 @@ import zlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_kin import REPO, Base  # noqa: E402
+from helpers import REPO, Base  # noqa: E402
 
 sys.path.insert(0, str(REPO / "skills" / "kinship-kit"))
 from kin import downloaders  # noqa: E402

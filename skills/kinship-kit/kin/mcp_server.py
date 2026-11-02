@@ -103,11 +103,12 @@ class Server:
         from .cli import build_parser
         if self.case and case and not _same_path(case, self.case):
             return f"сервер работает с делом {self.case}; другое дело — отдельным сервером"
+        err = io.StringIO()
         try:
-            with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
                 ns = build_parser().parse_args(args)
-        except SystemExit:
-            return ""  # неверные аргументы — kin сам вернёт ошибку, ничего не запустив
+        except SystemExit:  # неразобранную команду не запускаем: белый список проверяется только по разобранной
+            return "неверные аргументы\n" + (err.getvalue().strip() or "kin --help — список команд")
         cmd, sub = getattr(ns, "cmd", None), getattr(ns, "sub", None)
         if cmd not in ALLOWED or (ALLOWED[cmd] is not ALL and sub not in ALLOWED[cmd]):
             return f"kin {cmd}{' ' + sub if sub else ''}: {TERMINAL_ONLY}"

@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import __version__, audit, cli_stage3, cli_workflow, i18n, publish, site, status, workflow
+from . import __version__, audit, cli_exchange, cli_services, cli_workflow, i18n, publish, site, status, workflow
 from .i18n import t
 from .store import REGISTERS, REGISTRY_DIR, SCHEMA, Case, KinError, field_names, find_case_dir, init_case, register_by_prefix, sha256_file, split_ids
 
@@ -608,7 +608,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--task", help="Задача, к которой относится выгрузка")
     p.add_argument("--dry-run", action="store_true")
     _common(p)
-    p.set_defaults(fn=cli_stage3.cmd_import_download)
+    p.set_defaults(fn=cli_exchange.cmd_import_download)
     p = src.add_parser("add", help="Зарегистрировать источник: копия в sources/ + sha256")
     p.add_argument("file", nargs="?")
     _opts(p, SOURCE_MAP)
@@ -728,7 +728,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_site_serve)
 
     cli_workflow.add_commands(sub, _common)
-    cli_stage3.add_commands(sub, _common)
+    cli_exchange.add_commands(sub, _common)
+    cli_services.add_commands(sub, _common)
 
     p = sub.add_parser("doctor", help="Проверка окружения, размещения дела и приватности")
     _common(p)
