@@ -15,9 +15,20 @@ from . import __version__
 
 KIN_PY = Path(__file__).resolve().parent.parent / "kin.py"
 SUPPORTED = ["2025-06-18", "2025-03-26", "2024-11-05"]
-BLOCKED = {("site", "serve"): "site serve блокирует сервер — смотрите сайт командой в терминале",
-           ("mcp",): "вложенный MCP-сервер не нужен",
-           ("feedback", "serve"): "служба формы запускается в терминале или как сервис"}
+# Белый список: через MCP доступны только команды, которые читают дело или пишут внутрь него.
+# Всё, что пишет вне папки дела, запускает службы или меняет сам набор, — только человеком в терминале.
+ALL = None
+ALLOWED: dict[str, set[str] | None] = {
+    "source": {"add", "import-download"}, "person": ALL, "mention": ALL, "claim": ALL, "rel": ALL,
+    "add": ALL, "update": ALL, "show": ALL, "list": ALL, "schema": ALL, "case": {"set", "line"},
+    "audit": ALL, "status": ALL, "publish": ALL, "site": {"build", "theme"}, "migrate": ALL, "next": ALL,
+    "history": ALL, "task": ALL, "hypothesis": ALL, "search": ALL, "review": ALL, "request": ALL,
+    "downloader": {"list", "build"}, "upgrade": {"check"}, "index": ALL, "find": ALL,
+    "feedback": {"list", "show", "accept", "reject"}, "doctor": ALL,
+}
+# ключи, которые указывают путь вне дела: запрещены даже у разрешённых команд
+PATH_FLAGS = {"out": "--out", "to": "--to", "target": "--target", "publish_to": "--publish-to", "dir": "--dir"}
+TERMINAL_ONLY = "команда пишет вне папки дела или запускает службу — её выполняет человек в терминале"
 INSTRUCTIONS = ("kinship-kit: дело генеалогического исследования. Начинайте с kin_status и kin_next. "
                 "Изменения — инструментом kin (args — как в командной строке, например "
                 "[\"claim\",\"add\",\"--type\",\"birth\",…]); указывайте исполнителя: \"--as\", \"<роль>\". "
@@ -43,10 +54,15 @@ TOOLS = [
           {**CASE_PROP, "query": {"type": "string"}, "register": {"type": "string"}}, ["query"]),
     _tool("kin_schema", "Поля и словари реестров (как правильно записывать).",
           {"register": {"type": "string"}}),
-    _tool("kin", "Любая команда CLI kin (запись тоже). args — массив аргументов, как в терминале, без слова kin. "
+    _tool("kin", "Команда CLI kin внутри дела (запись тоже; экспорт, восстановление, выкладка и службы — только в терминале). "
+                 "args — массив аргументов, как в терминале, без слова kin. "
                  "Пример: [\"search\",\"add\",\"--task\",\"T-0001\",\"--source\",\"…\",\"--result\",\"not-found\",\"--as\",\"Archive Researcher\"].",
           {**CASE_PROP, "args": {"type": "array", "items": {"type": "string"}}}, ["args"], readonly=False),
 ]
+
+
+def _same_path(a: str, b: str) -> bool:
+    return Path(a).expanduser().resolve() == Path(b).expanduser().resolve()
 
 
 class Server:
@@ -56,7 +72,7 @@ class Server:
     def run_kin(self, args: list[str], case: str | None = None) -> tuple[str, bool]:
         if not isinstance(args, list) or not all(isinstance(a, str) for a in args) or not args:
             return "args должен быть непустым массивом строк", True
-        blocked = self._blocked(args)
+        blocked = self._blocked(args, case)
         if blocked:
             return f"Недоступно через MCP: {blocked}", True
         cmd = [sys.executable, str(KIN_PY)]
@@ -71,22 +87,30 @@ class Server:
         text = (res.stdout or "") + (("\n" + res.stderr) if res.stderr else "")
         return text.strip() or "(нет вывода)", res.returncode != 0
 
-    @staticmethod
-    def _blocked(args: list[str]) -> str:
+    def _blocked(self, args: list[str], case: str | None = None) -> str:
         """Команда определяется настоящим парсером kin (глобальные ключи перед командой не помогают обойти запрет)."""
         import contextlib
         import io
 
         from .cli import build_parser
+        if self.case and case and not _same_path(case, self.case):
+            return f"сервер работает с делом {self.case}; другое дело — отдельным сервером"
         try:
             with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
                 ns = build_parser().parse_args(args)
         except SystemExit:
             return ""  # неверные аргументы — kin сам вернёт ошибку, ничего не запустив
-        key = (getattr(ns, "cmd", None), getattr(ns, "sub", None))
-        for prefix, why in BLOCKED.items():
-            if key[:len(prefix)] == prefix:
-                return why
+        cmd, sub = getattr(ns, "cmd", None), getattr(ns, "sub", None)
+        if cmd not in ALLOWED or (ALLOWED[cmd] is not ALL and sub not in ALLOWED[cmd]):
+            return f"kin {cmd}{' ' + sub if sub else ''}: {TERMINAL_ONLY}"
+        for dest, flag in PATH_FLAGS.items():
+            if getattr(ns, dest, None):
+                return f"{flag}: {TERMINAL_ONLY}"
+        fixed = self.case or case
+        for dest in ("case", "case_global"):
+            other = getattr(ns, dest, None)
+            if other and fixed and not _same_path(other, fixed):
+                return f"--case {other}: сервер работает с делом {fixed}"
         return ""
 
     def call(self, name: str, a: dict) -> tuple[str, bool]:

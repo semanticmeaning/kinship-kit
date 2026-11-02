@@ -327,6 +327,22 @@ class TestStage3ReviewFixes(Base):
         res = run("restore", str(bad), str(Path(self.tmp.name) / "r"), ok=False)
         self.assertIn("лишний файл", res.stderr)
 
+    def test_mcp_whitelist(self):
+        srv = mcp_server.Server(str(self.case))
+        other = str(Path(self.tmp.name) / "other")
+        denied = [["restore", "x.zip"], ["import", "x.json"], ["export", "--out", "x.json"], ["backup"],
+                  ["site", "publish", "--to", other], ["hooks", "install"], ["upgrade", "apply"], ["init", other],
+                  ["agents", "install", "--target", other], ["downloader", "build", "dvinaland", "--out", "x.js"],
+                  ["gedcom", "export", "--out", "x.ged"], ["--case", other, "status"], ["status", "--case", other]]
+        for args in denied:
+            self.assertTrue(srv._blocked(args), args)
+        for args in (["status"], ["audit"], ["next"], ["find", "Сомова"], ["--case", str(self.case), "status"],
+                     ["site", "build"], ["upgrade", "check"], ["downloader", "list"]):
+            self.assertEqual(srv._blocked(args), "", args)
+        self.assertTrue(srv._blocked(["status"], case=other))  # параметр case инструмента тоже не уводит в чужое дело
+        res = srv.call("kin_status", {"case": other})
+        self.assertTrue(res[1] and "Недоступно" in res[0])
+
     def test_mcp_invalid_messages(self):
         srv = mcp_server.Server(str(self.case))
         self.assertIsNone(srv.handle({"jsonrpc": "2.0", "id": 10, "result": {}}))
