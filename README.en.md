@@ -7,7 +7,7 @@ Family data lives in a separate private case folder — on your computer or serv
 ## Install and first step
 
 ```bash
-git clone <repository> kinship-kit && cd kinship-kit
+git clone https://github.com/semanticmeaning/kinship-kit.git && cd kinship-kit
 sh install.sh            # skill → ~/.claude/skills and ~/.agents/skills, plus the `kin` command
 kin --lang en setup      # asks: main surname, case title and folder, commit author (a pseudonym is fine), roles
 ```

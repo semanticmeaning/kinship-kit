@@ -9,7 +9,7 @@ English: [README.en.md](README.en.md)
 ## Установка
 
 ```bash
-git clone <адрес репозитория> kinship-kit && cd kinship-kit
+git clone https://github.com/semanticmeaning/kinship-kit.git && cd kinship-kit
 sh install.sh            # навык в ~/.claude/skills (Claude Code) и ~/.agents/skills (Codex) + команда kin
 ```
 Только Python 3.10+, без зависимостей. Варианты: `--claude`, `--codex`, `--project <папка>`, `--link`.
