@@ -19,7 +19,10 @@ from .store import Case, split_ids, split_list
 
 FAMILY_KINDS = {"family-oral", "family-tree", "letter", "photo"}
 DOC_KINDS = {".jpg": "img", ".jpeg": "img", ".png": "img", ".webp": "img", ".gif": "img", ".pdf": "pdf",
-             ".html": "html", ".htm": "html", ".txt": "txt", ".json": "txt", ".xml": "txt", ".md": "txt"}
+             ".txt": "txt", ".json": "txt", ".md": "txt"}
+# активное содержимое (сохранённые веб-страницы, SVG, XML) не публикуется как есть: на сайте оно выполнилось бы от имени сайта —
+# выкладывается текстом (.txt), просмотрщик показывает исходный код
+ACTIVE = {".html", ".htm", ".xhtml", ".shtml", ".svg", ".svgz", ".xml", ".xsl", ".xslt", ".js", ".mjs", ".css"}
 REL_T = {"parent-of": "parent", "spouse-of": "spouse", "sibling-of": "sibling", "other": "kinship"}
 CLAIM_T = {"parentage": "parent", "sibling": "sibling", "kinship": "kinship", "identity": "identity"}
 CAND = {"candidate", "hypothesis", "unlikely"}
@@ -88,6 +91,8 @@ def build(case: Case, profile: str, pub: dict) -> tuple[dict, list[tuple[Path, s
         if case.root / "sources" not in p.parents or not p.is_file():
             continue
         name = re.sub(r"^A-\d+__", "", p.name)
+        if p.suffix.lower() in ACTIVE or not p.suffix.lower() in DOC_KINDS:
+            name += ".txt"  # только как текст
         files_of[aid] = [name]
         manifest.append((p, f"docs/{aid}/{name}"))
 

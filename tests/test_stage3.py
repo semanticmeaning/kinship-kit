@@ -482,3 +482,19 @@ class TestTreeData(unittest.TestCase):
             self.assertTrue(all(c["next"] == "" for c in pub["claims"]))  # рабочие планы — не публикуются
             self.assertNotIn("P-0005", json.dumps(pub, ensure_ascii=False))
             unlock(case)
+
+
+class TestActiveDocs(Base):
+    def test_html_source_published_as_text(self):
+        page = Path(self.tmp.name) / "archive-page.html"
+        page.write_text("<script>alert(1)</script><p>Страница каталога</p>", encoding="utf-8")
+        aid = json.loads(self.kin("source", "add", str(page), "--title", "Страница каталога", "--kind", "web-page",
+                                  "--group", "g1", "--json").stdout)["artifact_id"]
+        p = self.person("Ветлугин Сергей")
+        self.kin("claim", "add", "--type", "residence", "--subject", p, "--statement", "Жил в Кленовке", "--sources", aid,
+                 "--status", "single-source")
+        self.kin("site", "build")
+        docs = [x.name for x in (self.case / "site" / "private" / "docs" / aid).iterdir()]
+        self.assertEqual(docs, ["archive-page.html.txt"])
+        tree = json.loads((self.case / "site" / "private" / "tree.json").read_text(encoding="utf-8"))
+        self.assertEqual(tree["arts"][aid]["files"], [{"n": "archive-page.html.txt", "k": "txt"}])
