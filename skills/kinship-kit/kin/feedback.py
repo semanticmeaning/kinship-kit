@@ -49,6 +49,10 @@ def submit(case: Case, payload: dict, ip: str = "") -> str:
     cfg = settings(case)
     if not cfg["enabled"]:
         raise KinError("Форма сведений отключена")
+    payload = {**payload}
+    for new, old in (("person_id", "person"), ("author_name", "author"), ("author_email", "email")):
+        if new not in payload and old in payload:  # поля формы сайта-схемы
+            payload[new] = payload[old]
     if payload.get("consent") is not True:
         raise KinError("Нужно согласие на обработку сведений")
     text = str(payload.get("text", "")).strip()

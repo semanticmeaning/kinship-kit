@@ -398,7 +398,7 @@ class TestPublicationChoices(Base):
         self.assertTrue((out / "custom.css").is_file())
         self.kin("site", "theme", "init", "--full")
         page = self.case / "theme" / "index.html"
-        page.write_text(page.read_text(encoding="utf-8").replace("<title>Схема рода</title>", "<title>Наш род</title>"),
+        page.write_text(page.read_text(encoding="utf-8").replace("<title>Древо</title>", "<title>Наш род</title>"),
                         encoding="utf-8")
         self.assertIn("+<title>Наш род</title>", self.kin("site", "theme", "diff").stdout)
         self.kin("site", "build")
@@ -452,3 +452,33 @@ class TestPython310Compat(unittest.TestCase):
         bad = [f"{path.relative_to(REPO)}:{i}" for path in [*(REPO / "skills").rglob("*.py"), *(REPO / "tools").rglob("*.py")]
                for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1) if any(r.search(line) for r in rx)]
         self.assertEqual(bad, [])
+
+
+class TestTreeData(unittest.TestCase):
+    def test_demo_tree_format_docs_and_privacy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = demo(tmp)
+            run("site", "build", case=case)
+            run("site", "build", "--profile", "public", case=case)
+            priv = json.loads((case / "site" / "private" / "tree.json").read_text(encoding="utf-8"))
+            pub = json.loads((case / "site" / "public" / "tree.json").read_text(encoding="utf-8"))
+            for key in ("persons", "edges", "claims", "arts", "gens", "lines", "families", "feedback", "meta"):
+                self.assertIn(key, priv)
+            edges = {e["id"]: e for e in priv["edges"]}
+            self.assertEqual(edges["R-0005"]["lv"], "doc2")          # Сомов → Мария: две группы
+            self.assertEqual(edges["C-0008"]["t"], "identity")       # «возможно, одно лицо» из утверждения
+            self.assertEqual(edges["C-0009"]["lv"], "research")      # гипотеза отцовства
+            self.assertIn("Ветлугин", {f["key"] for f in priv["families"]})
+            p2 = next(p for p in priv["persons"] if p["id"] == "P-0002")
+            self.assertTrue(p2["direct"] and p2["b"]["ok"] and p2["d"]["conflict"])
+            # файлы источников: приватно — все использованные, публично — только scan_publication=allow
+            priv_docs = {p.parent.name for p in (case / "site" / "private" / "docs").rglob("*") if p.is_file()}
+            pub_docs = {p.parent.name for p in (case / "site" / "public" / "docs").rglob("*") if p.is_file()}
+            self.assertIn("A-0004", priv_docs)       # извещение (семейный архив) — только приватно
+            self.assertNotIn("A-0004", pub_docs)
+            self.assertIn("A-0001", pub_docs)        # метрика с разрешением на публикацию
+            self.assertEqual(pub["arts"]["A-0002"]["urls"], ["https://example.org/olhov-metriki/55102"])
+            self.assertEqual(pub["feedback"], [])
+            self.assertTrue(all(c["next"] == "" for c in pub["claims"]))  # рабочие планы — не публикуются
+            self.assertNotIn("P-0005", json.dumps(pub, ensure_ascii=False))
+            unlock(case)

@@ -35,14 +35,14 @@ def main() -> None:
 
     src = lambda f, *a: kin(case, "source", "add", str(DOCS / f), *a)  # noqa: E731
     # A-0001..A-0012 — порядок важен для ссылок ниже
-    src("metrika-1885-rozhd-12.txt", "--title", "МК Троицкой ц. с. Кленовки 1885, рожд. № 12", "--kind", "document-image",
+    src("metrika-1885-rozhd-12.txt", "--scan-publication", "allow", "--title", "МК Троицкой ц. с. Кленовки 1885, рожд. № 12", "--kind", "document-image",
         "--repository", "ГАОО (вымышл.)", "--ref", "ф. 15, оп. 2, д. 41, л. 7 об.", "--date", "1885-03-03",
         "--directness", "direct", "--originality", "image-of-original", "--group", "mk-1885-12",
         "--provenance", "Образ из электронного читального зала архива (вымышл.)")
     src("index-site-1885.txt", "--title", "Индекс «Олховские метрики», запись 55102", "--kind", "index-record",
         "--url", "https://example.org/olhov-metriki/55102", "--directness", "direct", "--originality", "index",
         "--group", "mk-1885-12", "--provenance", "Индекс той же метрической записи — не независим")
-    src("metrika-1910-brak-4.txt", "--title", "МК Троицкой ц. 1910, браки № 4", "--kind", "document-image",
+    src("metrika-1910-brak-4.txt", "--scan-publication", "allow", "--title", "МК Троицкой ц. 1910, браки № 4", "--kind", "document-image",
         "--repository", "ГАОО (вымышл.)", "--ref", "ф. 15, оп. 2, д. 66, л. 31", "--date", "1910-01-14",
         "--directness", "direct", "--originality", "image-of-original", "--group", "mk-1910-b4",
         "--provenance", "Образ из электронного читального зала (вымышл.)")
@@ -52,15 +52,15 @@ def main() -> None:
     src("kniga-pamyati-1942.txt", "--title", "Книга памяти Ольховской обл., т. 3, с. 212", "--kind", "book",
         "--date", "1995", "--directness", "direct", "--originality", "derivative", "--group", "kp-1942",
         "--provenance", "Опубликованная книга; первоисточник — донесение о потерях (не найдено)")
-    src("svid-1921.txt", "--title", "Выписка ЗАГС о рождении 1921, № 58", "--kind", "official-extract",
+    src("svid-1921.txt", "--scan-publication", "allow", "--title", "Выписка ЗАГС о рождении 1921, № 58", "--kind", "official-extract",
         "--repository", "ГАОО (вымышл.)", "--ref", "ф. Р-210, оп. 1, д. 12, л. 40", "--date", "1921-07-15",
         "--directness", "direct", "--originality", "official-extract", "--group", "zags-1921-58",
         "--provenance", "Архивная выписка по запросу (вымышл.)")
-    src("metrika-1880-rozhd-31.txt", "--title", "МК Троицкой ц. 1880, рожд. № 31", "--kind", "document-image",
+    src("metrika-1880-rozhd-31.txt", "--scan-publication", "allow", "--title", "МК Троицкой ц. 1880, рожд. № 31", "--kind", "document-image",
         "--repository", "ГАОО (вымышл.)", "--ref", "ф. 15, оп. 2, д. 36, л. 12", "--date", "1880-05-10",
         "--directness", "direct", "--originality", "image-of-original", "--group", "mk-1880-31",
         "--provenance", "Образ из электронного читального зала (вымышл.)")
-    src("prizyv-1903.txt", "--title", "Призывной список Заречного у. 1903, № 211", "--kind", "document-image",
+    src("prizyv-1903.txt", "--scan-publication", "allow", "--title", "Призывной список Заречного у. 1903, № 211", "--kind", "document-image",
         "--repository", "ГАОО (вымышл.)", "--ref", "ф. 98, оп. 1, д. 402, л. 55", "--date", "1903",
         "--directness", "direct", "--originality", "image-of-original", "--group", "prizyv-1903",
         "--provenance", "Образ из электронного читального зала (вымышл.)")

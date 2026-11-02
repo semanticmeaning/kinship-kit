@@ -248,8 +248,10 @@ class TestPublication(Base):
         self.kin("site", "build", "--profile", "public")
         out = self.case / "site" / "public"
         text = "".join(p.read_text(encoding="utf-8") for p in out.rglob("*") if p.is_file())
-        for secret in ("Анна Сергеевна", "Олег Сергеевич", self.user, self.unknown, "1952", "notes", "sha256"):
+        for secret in ("Анна Сергеевна", "Олег Сергеевич", self.user, self.unknown, "1952", "sha256"):
             self.assertNotIn(secret, text, secret)
+        tree = json.loads((out / "tree.json").read_text(encoding="utf-8"))
+        self.assertTrue(all(p["notes"] == "" and p["merge"] == "" for p in tree["persons"]))  # служебные заметки не выводятся
         self.assertIn("Сергей Петрович", text)
 
     def _leaks(self, statement):

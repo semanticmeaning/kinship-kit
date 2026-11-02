@@ -2,312 +2,1262 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>Схема рода</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Древо</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Serif:wght@700&display=swap">
 <style>
-:root{
-  --bg:#f6f4ef;--panel:#fffdf8;--ink:#23201b;--muted:#6f685c;--line:#cfc6b6;--edge:#8a7f6d;
-  --card:#fffdf8;--card-b:#d9cfbd;--accent:#7a4b1d;--chip:#efe8db;
-  --ok:#2f6b3a;--warn:#9a6a00;--bad:#9b2c2c;--hyp:#5a4a8a;--fam:#6f685c;
-  --shadow:0 1px 2px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.05);
+/* Раскладка: полноэкранное полотно-древо (колена — горизонтальные полосы), слева шкала колен, справа панель поиска/профиля, внизу легенда. */
+:root {
+  --bg: #eceff2; --band: #e3e7ec; --surface: #ffffff; --ink: #1d2733; --muted: #8b95a1; --soft: #5d6875;
+  --rule: #cfd6de; --edge: #3b4654; --edge-fam: #8e99a6; --hyp: #b4236e; --hyp-bg: #fbeef5; --rej: #b9c0c8;
+  --ok: #1f7a4d; --male: #6f95d8; --female: #d98aa6; --sexu: #a9b2bc; --shadow: 0 1px 2px rgb(20 30 45 / .10), 0 2px 8px rgb(20 30 45 / .06);
+  --serif: "PT Serif", Georgia, "Times New Roman", serif; --sans: "PT Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  color-scheme: light;
 }
-@media (prefers-color-scheme:dark){:root{
-  --bg:#191714;--panel:#221f1b;--ink:#ece6da;--muted:#a59d8f;--line:#4a443b;--edge:#9a8f7c;
-  --card:#25221d;--card-b:#4a443b;--accent:#e0a868;--chip:#332e27;
-  --ok:#7fc48b;--warn:#e2b04a;--bad:#e58a8a;--hyp:#b2a2ea;--fam:#a59d8f;--shadow:none}}
-*{box-sizing:border-box}
-html,body{margin:0;height:100%;}
-body{display:flex;flex-direction:column;background:var(--bg);color:var(--ink);
-  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif}
-header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
-header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.01em}
-.badge{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--chip);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.badge.public{background:var(--ok);color:var(--panel)}
-.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-left:auto}
-input[type=search]{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:180px}
-button,select{font:inherit;padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);cursor:pointer}
-button:hover{border-color:var(--edge)}
-label.tg{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:13px;cursor:pointer}
-main{display:flex;flex:1;min-height:0}
-#wrap{flex:1;overflow:auto;position:relative}
-#stage{position:relative;transform-origin:0 0}
-svg#edges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
-.gen-label{position:absolute;left:12px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
-.gen-band{position:absolute;left:0;right:0;border-top:1px dashed var(--line)}
-.card{position:absolute;width:176px;min-height:64px;padding:7px 9px 8px;border:1px solid var(--card-b);border-left:4px solid var(--lc,var(--card-b));
-  border-radius:9px;background:var(--card);box-shadow:var(--shadow);cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}
-.card:hover{transform:translateY(-1px)}
-.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.card.sel{outline:2px solid var(--accent)}
-.card.dim{opacity:.25}
-.card .nm{font-weight:600;font-size:13px;line-height:1.25}
-.card .dt{font-size:12px;color:var(--muted);margin-top:2px}
-.card .st{font-size:10.5px;margin-top:4px;color:var(--muted);text-transform:lowercase}
-.card.s-candidate{border-style:dashed;background:transparent}
-.card.s-hypothesis{border-style:dashed;border-color:var(--hyp)}
-.card.s-family-reported,.card.s-tree-entry-unverified{border-style:dotted}
-.card.s-unlikely{opacity:.5;text-decoration:line-through}
-.card.root{box-shadow:0 0 0 2px var(--accent)}
-.card .liv{font-size:10.5px;color:var(--warn)}
-#unplaced{position:absolute;left:12px}
-aside{width:min(420px,92vw);border-left:1px solid var(--line);background:var(--panel);overflow:auto;padding:14px 16px 40px;display:none}
-aside.open{display:block}
-aside h2{font-size:17px;margin:0 0 4px}
-aside h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:18px 0 6px}
-.close{float:right}
-.chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;background:var(--chip);margin-right:4px;white-space:nowrap}
-.chip.corroborated,.chip.strongly-corroborated{background:var(--ok);color:var(--panel)}
-.chip.single-source{background:var(--chip);color:var(--ink)}
-.chip.hypothesis{background:var(--hyp);color:var(--panel)}
-.chip.contradicted,.chip.unresolved{background:var(--warn);color:var(--panel)}
-.chip.rejected,.chip.superseded{background:var(--bad);color:var(--panel)}
-.claim{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;background:var(--bg)}
-.claim .meta{font-size:12px;color:var(--muted);margin-top:4px}
-.claim .src{font-size:12px;margin-top:4px}
-.claim .against{color:var(--bad)}
-.claim .compete{color:var(--warn);font-size:12px;margin-top:4px}
-.muted{color:var(--muted)}
-a{color:var(--accent)}
-.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);padding:6px 16px;border-bottom:1px solid var(--line)}
-.legend span{display:inline-flex;align-items:center;gap:5px}
-.sw{display:inline-block;width:22px;height:0;border-top:2px solid var(--edge)}
-.sw.d{border-top-style:dashed;border-color:var(--hyp)}.sw.o{border-top-style:dotted}
-.empty{padding:40px;color:var(--muted)}
-@media (max-width:700px){aside{position:fixed;right:0;top:0;bottom:0;z-index:9;width:100%}}
-@media (prefers-reduced-motion:reduce){.card{transition:none}}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11161c; --band: #161c23; --surface: #1d252e; --ink: #e5e9ee; --muted: #7f8a97; --soft: #a7b0bb;
+  --rule: #2e3843; --edge: #c3cbd4; --edge-fam: #6f7b88; --hyp: #f06aa9; --hyp-bg: #33202b; --rej: #4a535d;
+  --ok: #4cc78a; --male: #5e86c9; --female: #c77593; --sexu: #5d6773; --shadow: 0 1px 2px rgb(0 0 0 / .4); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11161c; --band: #161c23; --surface: #1d252e; --ink: #e5e9ee; --muted: #7f8a97; --soft: #a7b0bb;
+  --rule: #2e3843; --edge: #c3cbd4; --edge-fam: #6f7b88; --hyp: #f06aa9; --hyp-bg: #33202b; --rej: #4a535d;
+  --ok: #4cc78a; --male: #5e86c9; --female: #c77593; --sexu: #5d6773; --shadow: 0 1px 2px rgb(0 0 0 / .4); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.35 var(--sans); overflow: hidden; -webkit-tap-highlight-color: transparent; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--hyp); outline-offset: 2px; }
+
+#vp { position: fixed; inset: 0; overflow: hidden; touch-action: none; cursor: grab; }
+#vp.drag { cursor: grabbing; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#edges, #edges-top { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+#edges path, #edges line, #edges-top path { fill: none; }
+#edges, #edges-top, .ring { transition: opacity .15s; }
+.ring { fill: var(--surface); stroke: var(--edge-fam); stroke-width: 1.6; }
+.ring.doc { stroke: var(--edge); }
+.xmark { stroke: var(--soft); stroke-width: 2.4; stroke-linecap: round; }
+.ended { display: block; font-size: 12.5px; color: var(--soft); margin-top: 3px; }
+.arrow { fill: var(--edge-fam); }
+#world.hl #edges > :not(.band), #world.hl #edges-top > * { opacity: .13; }
+.band { fill: var(--band); }
+.e-doc2 { stroke: var(--edge); stroke-width: 3.4; }
+.e-doc1 { stroke: var(--edge); stroke-width: 1.6; }
+.e-family { stroke: var(--edge-fam); stroke-width: 1.8; stroke-dasharray: 7 4; }
+.e-research { stroke: var(--hyp); stroke-width: 2; stroke-dasharray: 11 4 2 4; }
+.e-identity { stroke: var(--hyp); stroke-width: 2.4; stroke-dasharray: 1 5; stroke-linecap: round; }
+.e-rejected { stroke: var(--rej); stroke-width: 1.6; stroke-dasharray: 3 4; }
+
+.card { position: absolute; left: 0; top: 0; width: 196px; height: 98px; background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 6px; box-shadow: var(--shadow); padding: 8px 9px 6px 46px; cursor: pointer; user-select: none; }
+.card::before { content: ""; position: absolute; left: 7px; top: 8px; width: 32px; height: 32px; background: var(--sexu);
+  -webkit-mask: url(icons/male.png) center / contain no-repeat; mask: url(icons/male.png) center / contain no-repeat; }
+.card.M::before { background: var(--male); }
+.card.F::before { background: var(--female); -webkit-mask-image: url(icons/female.png); mask-image: url(icons/female.png); }
+.card.cand { border: 1.5px dashed var(--hyp); background: var(--hyp-bg); }
+.card.unlikely { opacity: .55; }
+.card.sel { box-shadow: 0 0 0 3px var(--hyp), var(--shadow); }
+.card.root .nm { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.card.focus { outline: 3px solid var(--lc); outline-offset: 3px; }
+.nm { font: 700 13.5px/1.18 var(--serif); color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 32px; }
+.nm.ok { color: var(--ink); }
+.ok-mark { color: var(--ok); font: 700 12px var(--sans); margin-left: 2px; }
+.yr, .pl { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.pl { font-size: 11.5px; }
+.yr .ok, .pl.ok { color: var(--ink); }
+.yr .warn { color: var(--hyp); }
+.bd { position: absolute; left: 46px; right: 34px; bottom: 5px; font-size: 10.5px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em; }
+.bd b { color: var(--ok); font-weight: 700; }
+.bd i { color: var(--hyp); font-style: normal; }
+.ex { position: absolute; right: -1px; bottom: -1px; min-width: 30px; height: 22px; padding: 0 6px; border-radius: 6px 0 6px 0; border: 1px solid var(--rule);
+  background: var(--bg); font-size: 11.5px; font-weight: 700; color: var(--soft); }
+.ex:hover { color: var(--ink); background: var(--band); }
+.flag { position: absolute; left: 6px; top: -21px; height: 18px; padding: 0 7px; border-radius: 9px 9px 9px 0; background: var(--lc); color: #fff;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; line-height: 18px; white-space: nowrap; }
+.chip { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); max-width: 190px; height: 20px; padding: 0 8px; border-radius: 10px;
+  border: 1px solid var(--hyp); background: var(--surface); color: var(--hyp); font-size: 10.5px; line-height: 18px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.chip.rej { border-color: var(--rej); color: var(--soft); text-decoration: line-through; text-decoration-color: var(--rej); }
+
+#gens { position: fixed; left: 0; top: 0; bottom: 0; width: 0; pointer-events: none; z-index: 3; }
+.glab { position: absolute; left: max(8px, env(safe-area-inset-left, 0px)); padding: 4px 8px 4px 7px; border-left: 3px solid var(--edge-fam);
+  background: color-mix(in srgb, var(--bg) 88%, transparent); white-space: nowrap; }
+.glab b { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
+.glab span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+#bar { position: fixed; z-index: 5; top: max(10px, env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px));
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: calc(100vw - 400px); }
+.btn { height: 34px; padding: 0 11px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); box-shadow: var(--shadow); white-space: nowrap; }
+.btn:hover { background: var(--band); }
+.btn.on { border-color: var(--hyp); color: var(--hyp); }
+#famtog { display: inline-flex; align-items: center; gap: 7px; }
+.famx { display: none; width: .72em; height: .72em; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
+#famtog.on .famx { display: block; }
+#fams { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+#fams[hidden] { display: none; }
+.famchip { height: 28px; padding: 0 10px 0 8px; border: 1px solid var(--rule); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow);
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
+.famchip i { width: 11px; height: 11px; border-radius: 50%; background: var(--fc); flex: none; }
+.famchip small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.famchip.on { border-color: var(--fc); box-shadow: 0 0 0 1.5px var(--fc), var(--shadow); }
+.famchip.off { opacity: .5; }
+/* карточка в режиме «По семьям»: полоса слева и лёгкий оттенок; рамка кандидата сохраняется */
+.card.fam { border-left: 6px solid var(--fc); background: color-mix(in srgb, var(--fc) 10%, var(--surface)); }
+.card.fam.famdim { opacity: .45; }
+#qres .grp { padding: 6px 10px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--soft); background: var(--bg); }
+#qres .snip { display: block; color: var(--soft); font-size: 12px; line-height: 1.35; }
+.cell.flash { box-shadow: 0 0 0 2px var(--hyp); transition: box-shadow .3s; }
+.sq { width: 34px; padding: 0; font-size: 18px; line-height: 1; }
+#qwrap { position: relative; }
+#q { height: 34px; width: 220px; padding: 0 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); box-shadow: var(--shadow); }
+#qres { position: absolute; top: 38px; left: 0; width: 300px; max-height: 50vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; box-shadow: var(--shadow); }
+#qres button { display: block; width: 100%; text-align: left; padding: 7px 10px; border: 0; border-bottom: 1px solid var(--rule); background: none; }
+#qres button:hover, #qres button:focus { background: var(--band); }
+#qres small { color: var(--muted); }
+
+#legend { position: fixed; z-index: 4; left: max(10px, env(safe-area-inset-left, 0px)); bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  max-width: calc(100vw - 20px); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; box-shadow: var(--shadow);
+  padding: 6px 10px 8px; font-size: 12px; color: var(--soft); }
+.lg-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.lg-head b { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--soft); }
+#lgtog { border: 0; background: none; padding: 2px 0; font-size: 12px; color: var(--hyp); }
+#lgtog:hover { text-decoration: underline; }
+#lg-body { display: grid; grid-template-columns: auto auto; gap: 3px 16px; margin-top: 5px; }
+#lg-body[hidden] { display: none; }
+#lg-body > div { display: flex; gap: 7px; align-items: center; white-space: nowrap; }
+#lg-body svg { flex: none; }
+#lg-body > .lg-ver { grid-column: 1 / -1; display: block; white-space: normal; margin-top: 4px; padding-top: 5px; border-top: 1px solid var(--rule);
+  font-size: 11.5px; line-height: 1.45; color: var(--soft); font-variant-numeric: tabular-nums; }
+.lg-ver b { color: var(--ink); font-weight: 700; }
+.lg-card { width: 22px; height: 14px; border-radius: 3px; border: 1px solid var(--rule); background: var(--surface); flex: none; }
+.lg-card.c { border: 1.5px dashed var(--hyp); background: var(--hyp-bg); }
+.lg-t { color: var(--muted); } .lg-t b { color: var(--ink); font-weight: 400; }
+#lg-body > .lg-cr { grid-column: 1 / -1; font-size: 10.5px; color: var(--muted); }
+
+#panel { position: fixed; z-index: 6; top: 0; right: 0; bottom: 0; width: 380px; background: var(--surface); border-left: 1px solid var(--rule);
+  display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); padding-right: env(safe-area-inset-right, 0px); }
+#tabs { display: flex; border-bottom: 1px solid var(--rule); flex: none; }
+#tabs button { flex: 1; height: 42px; border: 0; background: none; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; }
+#tabs button.on { color: var(--ink); border-bottom-color: var(--hyp); }
+#tabs #hide { flex: 0 0 42px; font-size: 18px; }
+#pbody { overflow: auto; padding: 14px 16px 24px; flex: 1; min-height: 0; }
+#panel.min #pbody { display: none; }
+h2 { font: 700 19px/1.2 var(--serif); margin: 0 0 4px; text-wrap: balance; }
+h3 { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--soft); margin: 18px 0 6px; }
+.sub { color: var(--soft); font-size: 13px; }
+.line { border: 1px solid var(--rule); border-left: 4px solid var(--lc); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
+.line h4 { margin: 0; font-size: 14.5px; }
+.state { display: inline-block; margin: 4px 0; padding: 1px 8px; border-radius: 9px; background: var(--lc); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.state.wait { background: none; color: var(--lc); border: 1px solid var(--lc); }
+.hyp { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--rule); background: none; padding: 8px 0; font-size: 13px; cursor: pointer; }
+.hyp.cell { border: 1px solid var(--rule); padding: 8px 10px; }
+.hyp.cell.has-icons { padding-right: 58px; }
+.hyp:hover .ht { text-decoration: underline; }
+.need { display: block; color: var(--hyp); font-size: 12.5px; margin-top: 3px; }
+.need::before { content: "Что нужно: "; font-weight: 700; }
+.reason { display: block; color: var(--soft); font-size: 12.5px; margin-top: 3px; }
+.reason::before { content: "Почему отброшено: "; font-weight: 700; }
+.fact { padding: 7px 0; border-top: 1px solid var(--rule); font-size: 13px; }
+/* ячейка факта/связи/гипотезы: значки документов и ссылок в правом верхнем углу */
+.cell { position: relative; border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; font-size: 13px; }
+.cell.has-icons { padding-right: 58px; }
+.ficons { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; }
+.ic { width: 24px; height: 24px; display: grid; place-items: center; border: 0; border-radius: 5px; background: none; color: var(--soft); padding: 0; position: relative; }
+.ic:hover { background: var(--band); color: var(--hyp); }
+.ic svg { width: 17px; height: 17px; }
+.ic .n { position: absolute; right: -2px; bottom: -2px; min-width: 10.5px; height: 10.5px; padding: 0 2.5px; border-radius: 6px; background: var(--soft); color: var(--surface); font-size: 7.5px; line-height: 10.5px; font-weight: 700; }
+.menu { position: absolute; right: 0; top: 28px; z-index: 2; min-width: 240px; max-width: 320px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; box-shadow: var(--shadow); padding: 4px 0; }
+.menu a { display: block; padding: 6px 10px; color: var(--ink); text-decoration: none; font-size: 12.5px; }
+.menu a:hover { background: var(--band); }
+.menu small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+details.sec { border-top: 1px solid var(--rule); margin-top: 14px; }
+details.sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 10px 0 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--soft); }
+details.sec > summary::-webkit-details-marker { display: none; }
+details.sec > summary::after { content: ""; width: 7px; height: 7px; border-right: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor; transform: rotate(45deg); margin: 0 4px 3px 0; transition: transform .15s; }
+details.sec:not([open]) > summary::after { transform: rotate(-45deg); margin-bottom: 0; }
+details.sec > summary:hover { color: var(--ink); }
+/* галерея документов: поверх схемы, панель справа остаётся видна */
+#viewer { position: fixed; z-index: 7; left: 0; top: 0; right: var(--vr, 380px); bottom: var(--vb, 0px); background: rgb(14 18 24 / .9); color: #eef1f4;
+  display: grid; grid-template-rows: auto 1fr auto auto; padding-top: env(safe-area-inset-top, 0px); }
+#viewer[hidden] { display: none; }
+.vhead { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px 8px; }
+.vhead .t { flex: 1; min-width: 0; font-size: 13px; line-height: 1.4; font-weight: 700; }
+.vbtn { border: 1px solid rgb(255 255 255 / .25); background: rgb(255 255 255 / .08); color: #eef1f4; border-radius: 6px; height: 32px; min-width: 32px; padding: 0 10px; }
+.vbtn:hover { background: rgb(255 255 255 / .18); }
+.vbtn[hidden] { display: none; }
+.stage { position: relative; overflow: hidden; cursor: grab; touch-action: none; }
+.stage img { position: absolute; left: 0; top: 0; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; background: #fff; box-shadow: 0 2px 16px rgb(0 0 0 / .5); }
+.stage iframe, .stage pre, .stage .other { position: absolute; inset: 10px 60px; width: calc(100% - 120px); height: calc(100% - 20px); border: 0; background: #fff; color: #1d2733; }
+.stage pre { margin: 0; padding: 12px; overflow: auto; white-space: pre-wrap; font: 12px/1.45 ui-monospace, Consolas, monospace; }
+.stage .other { display: grid; place-content: center; gap: 10px; text-align: center; font-size: 14px; background: rgb(255 255 255 / .06); color: #eef1f4; }
+.stage .other a, .cap a { color: #f7a8cd; }
+.nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 56px; font-size: 26px; z-index: 1; }
+.nav.prev { left: 10px; } .nav.next { right: 10px; }
+.cap { padding: 8px 14px; font-size: 12.5px; line-height: 1.45; border-top: 1px solid rgb(255 255 255 / .12); max-height: 30vh; overflow: auto; }
+.cap .c { color: #b9c2cc; }
+.thumbs { display: flex; gap: 14px; overflow-x: auto; padding: 8px 14px calc(12px + env(safe-area-inset-bottom, 0px)); }
+.tg { flex: none; }
+.tg .lab { font-size: 11px; color: #b9c2cc; margin-bottom: 4px; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.tg .row { display: flex; gap: 6px; }
+.th { width: 64px; height: 64px; border: 2px solid transparent; border-radius: 4px; padding: 0; background: #fff center / cover no-repeat; opacity: .7; color: #1d2733; font-size: 11px; font-weight: 700; }
+.th.on { border-color: #f7a8cd; opacity: 1; }
+.lv { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 0 6px; border-radius: 8px; margin-right: 6px; border: 1px solid currentColor; }
+.lv-doc2, .lv-doc1 { color: var(--ok); } .lv-family { color: var(--muted); } .lv-hyp, .lv-research, .lv-open { color: var(--hyp); } .lv-rejected { color: var(--rej); }
+.src { font-size: 12.5px; color: var(--soft); padding: 5px 0; border-top: 1px solid var(--rule); }
+.src b { color: var(--ink); font-weight: 700; }
+.kv { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; font-size: 13px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.plink { border: 0; background: none; padding: 0; color: var(--ink); text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 2px; }
+.meta { margin-top: 22px; font-size: 11.5px; color: var(--muted); }
+.chk { display: flex; gap: 8px; align-items: center; font-size: 13px; padding: 4px 0; }
+.fb { display: grid; gap: 8px; margin-top: 10px; padding: 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--bg); }
+.fb label { font-size: 12px; color: var(--soft); }
+.fb .chk { align-items: flex-start; color: var(--soft); }
+.fb .chk input { margin-top: 3px; }
+.fb input:not([type=checkbox]), .fb select, .fb textarea { width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid var(--rule); border-radius: 5px; background: var(--surface); }
+.fb textarea { resize: vertical; min-height: 96px; line-height: 1.4; }
+.fb-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fb-row > div { display: grid; gap: 4px; min-width: 0; }
+.fb .note { font-size: 11.5px; color: var(--muted); }
+.btn.primary { background: var(--hyp); border-color: var(--hyp); color: #fff; justify-self: start; }
+.btn.primary:disabled { opacity: .6; cursor: wait; }
+.fb-msg { font-size: 13px; }
+.fb-msg.err { color: var(--hyp); } .fb-msg.ok { color: var(--ok); }
+.st { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 0 6px; border-radius: 8px; margin-right: 6px; border: 1px solid currentColor; color: var(--muted); }
+.st-проверяем { color: var(--hyp); } .st-подтверждено, .st-принято { color: var(--ok); } .st-не { color: var(--rej); }
+.fbtext { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+  #bar { max-width: calc(100vw - 20px); }
+  #q { width: 150px; }
+  .btn .long { display: none; }
+  .fb-row { grid-template-columns: 1fr; }
+  #panel { top: auto; left: 0; width: auto; height: 52vh; border-left: 0; border-top: 1px solid var(--rule); border-radius: 12px 12px 0 0;
+    padding-left: env(safe-area-inset-left, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  #panel.min { height: auto; }
+  #legend { bottom: calc(52vh + 8px); font-size: 11px; padding: 5px 8px 6px; }
+  body.pmin #legend { bottom: calc(50px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1 id="title">…</h1><span id="profile" class="badge"></span>
-  <div class="tools">
-    <input id="q" type="search" placeholder="Поиск по имени" aria-label="Поиск">
-    <label class="tg"><input id="showUnlikely" type="checkbox"> <span data-i="showRejected">отброшенные</span></label>
-    <button id="zoomOut" aria-label="−">−</button><button id="zoomIn" aria-label="+">+</button>
-    <button id="lang">EN</button>
+<div id="vp"><div id="world"><svg id="edges"></svg><svg id="edges-top"></svg></div></div>
+<style id="hlstyle"></style>
+<div id="gens"></div>
+
+<div id="bar">
+  <div id="qwrap"><input id="q" type="search" placeholder="Поиск: люди и утверждения" autocomplete="off" aria-label="Поиск по людям и утверждениям"><div id="qres" hidden></div></div>
+  <button class="btn sq" id="zin" title="Крупнее" aria-label="Крупнее">+</button>
+  <button class="btn sq" id="zout" title="Мельче" aria-label="Мельче">−</button>
+  <button class="btn" id="famtog" aria-pressed="false" title="Раскрасить карточки по семьям">По семьям<svg class="famx" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
+  <div id="fams" hidden></div>
+</div>
+
+<div id="legend" aria-label="Легенда">
+  <div class="lg-head"><b>Легенда</b><button id="lgtog" aria-expanded="true" aria-controls="lg-body">Скрыть</button></div>
+  <div id="lg-body">
+  <div><svg width="34" height="8"><line x1="0" y1="4" x2="34" y2="4" class="e-doc2"/></svg>2+ документа</div>
+  <div><span class="lg-card"></span>человек из дерева</div>
+  <div><svg width="34" height="8"><line x1="0" y1="4" x2="34" y2="4" class="e-doc1"/></svg>1 документ</div>
+  <div><span class="lg-card c"></span>кандидат из архива</div>
+  <div><svg width="34" height="8"><line x1="0" y1="4" x2="34" y2="4" class="e-family"/></svg>семейные сведения</div>
+  <div class="lg-t"><b>тёмный ✓</b>&nbsp;— по документу</div>
+  <div><svg width="34" height="8"><line x1="0" y1="4" x2="34" y2="4" class="e-research"/></svg>гипотеза поиска</div>
+  <div class="lg-t">серый — не подтверждено</div>
+  <div><svg width="34" height="8"><line x1="1" y1="4" x2="34" y2="4" class="e-identity"/></svg>возможно, одно лицо</div>
+  <div><svg width="34" height="8"><line x1="0" y1="4" x2="34" y2="4" class="e-rejected"/></svg>отброшено</div>
+  <div><svg width="34" height="12"><line x1="0" y1="6" x2="34" y2="6" class="e-family"/><circle class="ring" cx="14" cy="6" r="4"/><circle class="ring" cx="20" cy="6" r="4"/></svg>супруги</div>
+  <div><svg width="34" height="14"><line x1="0" y1="7" x2="34" y2="7" class="e-family"/><path class="xmark" d="M12,2 L22,12 M22,2 L12,12"/></svg>брак расторгнут</div>
+  <div class="lg-t">наведите на человека — его линии</div>
+  <div class="lg-ver" id="lg-ver"></div>
+  <div class="lg-cr">Иконки: kareemovic2000, Noun Project (CC BY 3.0)</div>
   </div>
-</header>
-<div class="legend" id="legend"></div>
-<main>
-  <div id="wrap"><div id="stage"><svg id="edges"></svg></div></div>
-  <aside id="panel" aria-live="polite"></aside>
-</main>
+</div>
+
+<div id="viewer" hidden role="dialog" aria-label="Документы">
+  <div class="vhead"><div class="t" id="vt"></div>
+    <button class="vbtn" id="vfit" title="Вписать">Вписать</button>
+    <button class="vbtn" id="vclose" title="Закрыть (Esc)" aria-label="Закрыть">✕</button></div>
+  <div class="stage" id="stage"><img id="vimg" alt="">
+    <button class="vbtn nav prev" id="vprev" aria-label="Предыдущая страница">‹</button>
+    <button class="vbtn nav next" id="vnext" aria-label="Следующая страница">›</button></div>
+  <div class="cap" id="vcap"></div>
+  <div class="thumbs" id="vthumbs"></div>
+</div>
+<aside id="panel">
+  <div id="tabs" role="tablist">
+    <button id="t-search" class="on" role="tab">Линии поиска</button>
+    <button id="t-person" role="tab">Человек</button>
+    <button id="hide" title="Свернуть панель" aria-label="Свернуть панель">›</button>
+  </div>
+  <div id="pbody"></div>
+</aside>
+
 <script>
-"use strict";
-const I18N = {
-  ru:{gen:{0:"Поколение корня","-1":"Родители","-2":"Деды и бабушки","-3":"Прадеды","-4":"Прапрадеды","-5":"5-е колено вверх","-6":"6-е колено вверх",1:"Дети",2:"Внуки",3:"Правнуки"},
-      genN:n=>n<0?`${-n}-е колено вверх`:`${n}-е колено вниз`, unplaced:"Вне схемы (колено не установлено)",
-      showRejected:"отброшенные", search:"Поиск по имени", close:"Закрыть", claims:"Утверждения", rels:"Связи",
-      sources:"Источники", against:"против", competing:"конкурирующая версия", hyps:"Гипотезы", variants:"Варианты имени",
-      places:"Места", noClaims:"Утверждений нет", living:"жив(а)", unknownLiving:"статус жизни неизвестен",
-      parentOf:"родитель", childOf:"ребёнок", spouse:"супруг(а)", sibling:"брат/сестра", other:"связь",
-      private:"приватная сборка", public:"публичная сборка", empty:"В публикационном наборе нет людей.",
-      legend:{edge:"родство по источнику",hyp:"гипотеза",ident:"возможно одно лицо",cand:"кандидат (родство не установлено)",fam:"со слов семьи / из древа"},
-      st:{"tree-entry-unverified":"из древа, не проверено","family-reported":"со слов семьи",candidate:"кандидат","identity-probable":"личность вероятна","identity-confirmed":"личность подтверждена",hypothesis:"гипотеза",unlikely:"отброшен"},
-      cs:{hypothesis:"гипотеза","single-source":"один источник",corroborated:"подтверждено","strongly-corroborated":"надёжно подтверждено",contradicted:"противоречие",unresolved:"не решено",rejected:"отвергнуто",superseded:"заменено"},
-      hidden:n=>`скрыто людей: ${n}`,
-      fb:{title:"Дополнить сведения",name:"Ваше имя",email:"E-mail (необязательно, для ответа)",text:"Что вы знаете об этом человеке? Даты, места, родственники, документы.",
-          consent:"Согласен(а) на обработку этих сведений исследователем семьи",send:"Отправить",ok:id=>`Спасибо! Сообщение ${id} получено — исследователь рассмотрит его.`,err:"Не отправлено: "}},
-  en:{gen:{0:"Root generation","-1":"Parents","-2":"Grandparents","-3":"Great-grandparents","-4":"2× great-grandparents",1:"Children",2:"Grandchildren",3:"Great-grandchildren"},
-      genN:n=>n<0?`${-n} generations up`:`${n} generations down`, unplaced:"Not placed (generation unknown)",
-      showRejected:"rejected", search:"Search by name", close:"Close", claims:"Claims", rels:"Relationships",
-      sources:"Sources", against:"against", competing:"competing version", hyps:"Hypotheses", variants:"Name variants",
-      places:"Places", noClaims:"No claims", living:"living", unknownLiving:"living status unknown",
-      parentOf:"parent", childOf:"child", spouse:"spouse", sibling:"sibling", other:"relation",
-      private:"private build", public:"public build", empty:"No people in the publication dataset.",
-      legend:{edge:"kinship stated in a source",hyp:"hypothesis",ident:"possibly the same person",cand:"candidate (kinship not established)",fam:"family-reported / from a tree"},
-      st:{"tree-entry-unverified":"tree entry, unverified","family-reported":"family-reported",candidate:"candidate","identity-probable":"identity probable","identity-confirmed":"identity confirmed",hypothesis:"hypothesis",unlikely:"rejected"},
-      cs:{hypothesis:"hypothesis","single-source":"single source",corroborated:"corroborated","strongly-corroborated":"strongly corroborated",contradicted:"contradicted",unresolved:"unresolved",rejected:"rejected",superseded:"superseded"},
-      hidden:n=>`hidden people: ${n}`,
-      fb:{title:"Add information",name:"Your name",email:"E-mail (optional, for a reply)",text:"What do you know about this person? Dates, places, relatives, documents.",
-          consent:"I agree that the family researcher may process this information",send:"Send",ok:id=>`Thank you! Message ${id} received — the researcher will review it.`,err:"Not sent: "}}
-};
-const W=176, GAP=22, ROW=150, TOP=36, LEFT=150;
-let D, L, lang, zoom=1, selected=null;
-const $=s=>document.querySelector(s);
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+'use strict';
+const CW = 196, CH = 98, SG = 40, GAP = 34, ROW = 206;
+let FAMW = .05;  // притяжение связанных блоков к своей семье (одиночки без связей — 1, выбранная семья — 4)
+const STRUCT = new Set(['parent', 'spouse', 'sibling']);
+const CAND = new Set(['candidate', 'hypothesis', 'unlikely']);
+const LV_NAME = { doc2: 'подтверждено', doc1: 'подтверждено', family: 'семейные сведения', hyp: 'гипотеза', research: 'гипотеза', open: 'не решено', rejected: 'отброшено' };
+const CAND_NAME = { 'tree-entry-unverified': 'запись семейного дерева', candidate: 'кандидат из архивных источников', hypothesis: 'гипотетический предок',
+  'identity-probable': 'личность подтверждена документами (вероятно)', 'identity-confirmed': 'личность подтверждена документами',
+  'family-reported': 'со слов семьи', unlikely: 'маловероятный кандидат' };
+const LIV_NAME = { living: 'жив(а)', deceased: 'умер(ла)', 'probably-deceased': 'вероятно, умер(ла)', 'possibly-living': 'возможно, жив(а)', unknown: 'неизвестно' };
+const T_NAME = { parent: 'родитель', spouse: 'супруг(а)', sibling: 'брат/сестра', cousin: 'двоюродные', kinship: 'родство', identity: 'одно лицо?' };
 
-fetch("tree.json",{cache:"no-store"}).then(r=>r.json()).then(d=>{D=d;
-  lang=store.get("kin-lang")||(d.meta.language==="en"?"en":"ru"); init();}).catch(e=>{
-  document.body.insertAdjacentHTML("beforeend",`<p class="empty">tree.json: ${esc(e.message)}</p>`)});
+const S = { expanded: new Set(), forced: new Set(), all: false, showRej: false, sel: null, view: { x: 0, y: 0, k: 1 }, pos: new Map(), tab: 'search' };
+let D, P, E, nb, CL, LN, minGen, maxGen;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let ALIASES = [];  // варианты написания фамилии для поиска: case.json → site.search_aliases
+const norm = s => ALIASES.reduce((x, [a, b]) => x.split(a).join(b), s.toLowerCase().replace(/ё/g, 'е'));
 
-function init(){
-  D.byId=Object.fromEntries(D.persons.map(p=>[p.id,p]));
-  D.src=Object.fromEntries(D.sources.map(s=>[s.id,s]));
-  D.claimById=Object.fromEntries(D.claims.map(c=>[c.id,c]));
-  D.lineById=Object.fromEntries((D.meta.lines||[]).map(l=>[l.id,l]));
-  $("#q").addEventListener("input",highlight);
-  $("#showUnlikely").checked=store.get("kin-unlikely")==="1";
-  $("#showUnlikely").addEventListener("change",e=>{store.set("kin-unlikely",e.target.checked?"1":"0");render()});
-  $("#zoomIn").onclick=()=>setZoom(zoom*1.15); $("#zoomOut").onclick=()=>setZoom(zoom/1.15);
-  $("#lang").onclick=()=>{lang=lang==="ru"?"en":"ru";store.set("kin-lang",lang);render()};
-  document.addEventListener("keydown",e=>{if(e.key==="Escape")closePanel()});
-  const hashId=()=>{try{return decodeURIComponent(location.hash.slice(1))}catch(e){return ""}};
-  const h=hashId(); if(D.byId[h])selected=h;
-  window.addEventListener("hashchange",()=>{const id=hashId(); if(D.byId[id])open(id)});
-  render();
-}
-function setZoom(z){zoom=Math.min(2,Math.max(.4,z));$("#stage").style.transform=`scale(${zoom})`;}
+fetch('tree.json', { cache: 'no-store' }).then(r => r.json()).then(init).catch(err => {
+  document.body.insertAdjacentHTML('beforeend', `<p style="position:fixed;top:60px;left:16px">Не удалось загрузить данные схемы (${esc(err.message)}). Обновите страницу.</p>`);
+});
 
-function genName(g){return L.gen[g]??L.genN(g)}
-function visiblePersons(){const u=$("#showUnlikely").checked;return D.persons.filter(p=>u||p.status!=="unlikely")}
-
-function layout(people){
-  const ids=new Set(people.map(p=>p.id)), rows=new Map(), unplaced=[];
-  for(const p of people){ if(p.gen===null||p.gen===undefined){unplaced.push(p);continue}
-    if(!rows.has(p.gen))rows.set(p.gen,[]); rows.get(p.gen).push(p);}
-  const gens=[...rows.keys()].sort((a,b)=>a-b);
-  const parents={},children={},spouses={};
-  for(const r of D.relationships){ if(!ids.has(r.a)||!ids.has(r.b))continue;
-    if(r.type==="parent-of"){(children[r.a]??=[]).push(r.b);(parents[r.b]??=[]).push(r.a)}
-    if(r.type==="spouse-of"){(spouses[r.a]??=[]).push(r.b);(spouses[r.b]??=[]).push(r.a)}}
-  // гипотезы родства из утверждений тоже участвуют в раскладке (первый subject в parentage — родитель)
-  for(const c of D.claims){ if(c.type!=="parentage"||c.status!=="hypothesis"||c.subjects.length<2)continue; const [a,b]=c.subjects;
-    if(ids.has(a)&&ids.has(b)){(children[a]??=[]).push(b);(parents[b]??=[]).push(a)}}
-  // «возможно одно лицо» — тоже рядом, чтобы точечная линия не пересекала чужие карточки
-  for(const c of D.claims){ if(c.type!=="identity"||c.subjects.length<2)continue; const [a,b]=c.subjects;
-    if(ids.has(a)&&ids.has(b)){(spouses[a]??=[]).push(b);(spouses[b]??=[]).push(a)}}
-  const by=p=>parseInt(p.birth)||9999, x={};
-  for(const g of gens){rows.get(g).sort((a,b)=>by(a)-by(b)||a.id.localeCompare(b.id)).forEach((p,i)=>x[p.id]=i)}
-  const avg=(arr)=>{const v=(arr||[]).filter(i=>i in x).map(i=>x[i]);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
-  for(let pass=0;pass<4;pass++){
-    const seq=pass%2?gens:[...gens].reverse();
-    for(const g of seq){const row=rows.get(g);
-      row.forEach(p=>{const a=avg(pass%2?parents[p.id]:children[p.id]);
-        const linked=parents[p.id]||children[p.id]; p._k=a!==null?a:(linked?x[p.id]:1e6+x[p.id])});
-      row.sort((a,b)=>a._k-b._k); groupSpouses(row,spouses); row.forEach((p,i)=>x[p.id]=i);}}
-  const pos={}; let maxW=0;
-  gens.forEach((g,gi)=>{const row=rows.get(g);
-    // центрируем ряд под средним положением родителей, без наложений
-    let cursor=LEFT;
-    row.forEach(p=>{let want=cursor; const px=parents[p.id]?.filter(i=>pos[i]);
-      if(px&&px.length) want=px.reduce((s,i)=>s+pos[i].x,0)/px.length;
-      const left=Math.max(cursor,want); pos[p.id]={x:left,y:TOP+gi*ROW}; cursor=left+W+GAP;});
-    maxW=Math.max(maxW,cursor);});
-  const uy=TOP+gens.length*ROW+30; let ux=LEFT;
-  unplaced.sort((a,b)=>(a.line||"").localeCompare(b.line||"")||by(a)-by(b)).forEach((p,i)=>{
-    pos[p.id]={x:ux,y:uy+28}; ux+=W+GAP; if(ux>Math.max(maxW,1200)){ux=LEFT;}});
-  return {gens,pos,unplaced,uy,width:Math.max(maxW,ux)+40,height:uy+(unplaced.length?ROW+60:0)};
-}
-function groupSpouses(row,spouses){
-  const seen=new Set(),out=[];
-  for(const p of row){ if(seen.has(p.id))continue; out.push(p);seen.add(p.id);
-    for(const s of spouses[p.id]||[]){const q=row.find(r=>r.id===s); if(q&&!seen.has(q.id)){out.push(q);seen.add(q.id)}}}
-  row.splice(0,row.length,...out);
+function init(data) {
+  D = data; ALIASES = D.meta.aliases || []; P = new Map(D.persons.map(p => [p.id, p])); E = D.edges;
+  if (D.meta.title) document.title = D.meta.title;
+  (D.families || []).forEach(f => { FAMCOL[f.key] = f.color; });
+  D.claims.forEach(c => { c.q = norm([c.text, c.next].join(' ')); });
+  CL = new Map(D.claims.map(c => [c.id, c])); LN = new Map(D.lines.map(l => [l.id, l]));
+  nb = new Map(D.persons.map(p => [p.id, []]));
+  for (const e of E) { nb.get(e.a)?.push(e); nb.get(e.b)?.push(e); }
+  const gs = D.persons.map(p => p.gen); minGen = Math.min(...gs); maxGen = Math.max(...gs);
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (P.has(h)) { VIS = computeVisible(); if (!VIS.has(h)) revealPath(h); S.sel = h; }  // ссылка #P-…: человек вместе с цепочкой родства
+  bindUI(); renderVersion(); renderPanel(); relayout(null, false);
+  if (S.sel) focusPerson(S.sel); else fit(false, D.persons.filter(p => p.direct && VIS.has(p.id)).map(p => p.id));
 }
 
-function render(){
-  L=I18N[lang]; document.documentElement.lang=lang; $("#lang").textContent=lang==="ru"?"EN":"RU";
-  document.title=D.meta.title||"Kinship";
-  $("#title").textContent=D.meta.title; $("#q").placeholder=L.search;
-  $("#profile").textContent=L[D.meta.profile]+(D.meta.hidden_persons?` · ${L.hidden(D.meta.hidden_persons)}`:"");
-  $("#profile").className="badge "+D.meta.profile;
-  document.querySelectorAll("[data-i]").forEach(e=>e.textContent=L[e.dataset.i]);
-  $("#legend").innerHTML=`<span><i class="sw"></i>${L.legend.edge}</span><span><i class="sw d"></i>${L.legend.hyp}</span>
-    <span><i class="sw o"></i>${L.legend.ident}</span>`+
-    (D.meta.lines||[]).map(l=>`<span><i class="sw" style="border-color:${esc(l.color||"var(--edge)")};border-top-width:4px"></i>${esc(l.title)}${l.state?` — ${esc(l.state)}`:""}</span>`).join("");
-  const stage=$("#stage"); stage.querySelectorAll(".card,.gen-label,.gen-band").forEach(e=>e.remove());
-  const people=visiblePersons();
-  if(!people.length){stage.insertAdjacentHTML("beforeend",`<p class="empty gen-label" style="top:20px">${L.empty}</p>`);return}
-  const lay=layout(people); D.lay=lay;
-  lay.gens.forEach((g,i)=>{stage.insertAdjacentHTML("beforeend",
-    `<div class="gen-band" style="top:${TOP+i*ROW-14}px"></div><div class="gen-label" style="top:${TOP+i*ROW-10}px">${esc(genName(g))}</div>`)});
-  if(lay.unplaced.length)stage.insertAdjacentHTML("beforeend",
-    `<div class="gen-band" style="top:${lay.uy}px"></div><div class="gen-label" style="top:${lay.uy+6}px">${L.unplaced}</div>`);
-  for(const p of people){const {x,y}=lay.pos[p.id]; const ln=D.lineById[p.line];
-    const d=[p.birth_h&&("* "+p.birth_h),p.death_h&&("† "+p.death_h)].filter(Boolean).join("  ");
-    const liv=p.living==="living"?`<div class="liv">${L.living}</div>`:"";
-    stage.insertAdjacentHTML("beforeend",`<div class="card s-${esc(p.status)}${p.id===D.meta.root?" root":""}${p.id===selected?" sel":""}" tabindex="0" role="button"
-      data-id="${esc(p.id)}" style="left:${x}px;top:${y}px;${ln&&ln.color?`--lc:${esc(ln.color)}`:""}">
-      <div class="nm">${esc(p.label)}</div><div class="dt">${esc(d)}</div>${liv}<div class="st">${esc(L.st[p.status]||p.status)}</div></div>`);}
-  stage.querySelectorAll(".card").forEach(c=>{c.onclick=()=>open(c.dataset.id);
-    c.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open(c.dataset.id)}}});
-  drawEdges(people,lay); stage.style.width=lay.width+"px"; stage.style.height=lay.height+"px"; setZoom(zoom); highlight();
-  if(selected&&D.byId[selected])open(selected,!!D.opened); D.opened=true;
+// версия схемы и последнее изменение данных (подпись чата из коммита — см. CLAUDE.md, правило «Подпись»)
+function renderVersion() {
+  const m = D.meta, ch = m.change;
+  let when = '';
+  if (ch && ch.date) { const d = new Date(ch.date); when = isNaN(d) ? ch.date : d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  $('lg-ver').innerHTML = `Версия: <b>${esc(m.schema || '—')}</b> · данные ${esc(m.version)}` +
+    (ch ? `<br>Изменено: ${esc(when)}<br>Автор: ${ch.chat ? `<b>чат «${esc(ch.chat)}»</b>` : 'без подписи чата'}` : '');
+  if (ch) $('lg-ver').title = `${ch.subject || ''} (${ch.commit || ''})`;
 }
 
-function drawEdges(people,lay){
-  const ids=new Set(people.map(p=>p.id)), pos=lay.pos, svg=$("#edges");
-  svg.setAttribute("width",lay.width); svg.setAttribute("height",lay.height);
-  const H=64, parts=[], hyp=s=>s==="hypothesis";
-  const cand=id=>["candidate","hypothesis"].includes(D.byId[id]?.status);
-  const line=(x1,y1,x2,y2,cls)=>parts.push(`<path d="M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}" ${cls}/>`);
-  const style={solid:`fill="none" stroke="var(--edge)" stroke-width="1.4"`,dash:`fill="none" stroke="var(--hyp)" stroke-width="1.4" stroke-dasharray="6 4"`,
-    dot:`fill="none" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="2 4"`};
-  for(const r of D.relationships){ if(!ids.has(r.a)||!ids.has(r.b)||r.status==="rejected"||r.status==="superseded")continue;
-    const evid=["single-source","corroborated","strongly-corroborated"].includes(r.status);
-    const a=pos[r.a],b=pos[r.b]; const st=(!evid||cand(r.a)||cand(r.b))?style.dash:style.solid;
-    if(r.type==="parent-of") line(a.x+W/2,a.y+H,b.x+W/2,b.y,st);
-    else{const [l,rr]=a.x<b.x?[a,b]:[b,a]; const y=l.y+H/2;
-      parts.push(`<path d="M${l.x+W},${y} L${rr.x},${rr.y+H/2}" ${st}/>`);
-      if(r.type==="spouse-of"){const cx=(l.x+W+rr.x)/2;
-        parts.push(`<circle cx="${cx-3}" cy="${y-9}" r="4.5" fill="none" stroke="var(--edge)" stroke-width="1.3"/><circle cx="${cx+3}" cy="${y-9}" r="4.5" fill="none" stroke="var(--edge)" stroke-width="1.3"/>`)}}}
-  // гипотезы и тождества из утверждений (между двумя людьми)
-  for(const c of D.claims){ if(!["parentage","sibling","kinship","identity"].includes(c.type)||c.subjects.length<2)continue;
-    if(c.type!=="identity"&&c.status!=="hypothesis")continue;
-    const [p,q]=c.subjects; if(!ids.has(p)||!ids.has(q))continue; const a=pos[p],b=pos[q];
-    const st=c.type==="identity"?style.dot:style.dash;
-    if(a.y===b.y){const [l,rr]=a.x<b.x?[a,b]:[b,a]; parts.push(`<path d="M${l.x+W},${l.y+H/2} L${rr.x},${rr.y+H/2}" ${st}/>`)}
-    else{const [u,d]=a.y<b.y?[a,b]:[b,a]; line(u.x+W/2,u.y+H,d.x+W/2,d.y,st)}}
-  svg.innerHTML=parts.join("");
+/* ---------- кто виден ---------- */
+const other = (e, id) => e.a === id ? e.b : e.a;
+function edgeShown(e) { return e.lv !== 'rejected' || S.showRej; }
+function baseVisibleCore(p) { return p.direct || CAND.has(p.cand); }
+function baseVisible(p) {
+  if (S.all) return p.cand !== 'unlikely' || S.showRej;
+  if (p.cand === 'unlikely') return S.showRej;
+  return p.direct || CAND.has(p.cand) || S.forced.has(p.id);
+}
+function computeVisible() {
+  const vis = new Set(D.persons.filter(baseVisible).map(p => p.id));
+  for (const id of [...vis]) for (const e of nb.get(id)) if (e.lv === 'research' || e.t === 'identity') { if (edgeShown(e)) vis.add(other(e, id)); }
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const id of S.expanded) {
+      if (!vis.has(id)) continue;
+      for (const e of nb.get(id)) {
+        if (!STRUCT.has(e.t) || !edgeShown(e)) continue;
+        const o = other(e, id);
+        if (!vis.has(o) && (P.get(o).cand !== 'unlikely' || S.showRej)) { vis.add(o); grew = true; }
+      }
+    }
+  }
+  for (const id of [...S.expanded]) if (!vis.has(id)) S.expanded.delete(id);
+  return vis;
+}
+const FAMCOL = {};
+function setFamMode(on, persist = true) {
+  const had = S.famFilter; S.famMode = on; if (!on) applyFamFilter(null);
+  $('famtog').classList.toggle('on', on); $('famtog').setAttribute('aria-pressed', on);
+  $('famtog').title = on ? 'Выключить режим «По семьям»' : 'Раскрасить карточки по семьям';
+  if (persist) { try { localStorage.setItem('fam-mode', on ? '1' : '0'); } catch (e) {} }
+  renderFams(); if (LAY) had ? relayout(famAnchor(had)) : refreshCards();
+}
+// фильтр семьи: показать всех её людей вместе с цепочками родства до видимых; при смене или сбросе фильтра — убрать только добавленное им
+function applyFamFilter(f) {
+  if (S.famAdded) { S.famAdded.forEach(id => S.forced.delete(id)); S.famAdded = null; }
+  S.famFilter = f;
+  VIS = computeVisible();
+  if (!f) return;
+  const before = new Set(S.forced);
+  for (const p of D.persons) {
+    if (p.fam !== f || VIS.has(p.id) || (p.cand === 'unlikely' && !S.showRej)) continue;
+    revealPath(p.id); VIS = computeVisible();
+  }
+  S.famAdded = new Set([...S.forced].filter(id => !before.has(id)));
+}
+// при перестройке под семью экран держится за её карточку (выбранную или первую видимую)
+function famAnchor(f) {
+  if (S.sel && VIS.has(S.sel) && P.get(S.sel).fam === f) return S.sel;
+  return [...VIS].find(id => P.get(id).fam === f && P.get(id).direct) || [...VIS].find(id => P.get(id).fam === f) || D.meta.root;
+}
+function renderFams() {
+  $('fams').hidden = !S.famMode;
+  $('fams').innerHTML = (D.families || []).map(f => `<button class="famchip${S.famFilter === f.key ? ' on' : S.famFilter ? ' off' : ''}" data-fam="${esc(f.key)}" style="--fc:${f.color}" title="${S.famFilter === f.key ? 'Показать все семьи' : 'Оставить цветной только эту семью'}"><i></i>${esc(f.name)} <small>${f.count}</small></button>`).join('');
+}
+function refreshCards() { buildCards(); place(1, S.pos); }
+function hiddenCount(id, vis) {
+  const s = new Set();
+  for (const e of nb.get(id)) if (STRUCT.has(e.t) && edgeShown(e) && !vis.has(other(e, id))) s.add(other(e, id));
+  return s.size;
 }
 
-function highlight(){
-  const q=$("#q").value.trim().toLowerCase();
-  document.querySelectorAll(".card").forEach(c=>{const p=D.byId[c.dataset.id];
-    const hay=[p.label,...(p.variants||[])].join(" ").toLowerCase(); c.classList.toggle("dim",!!q&&!hay.includes(q))});
+/* ---------- раскладка: колена по Y, семьи по X ---------- */
+function layout(vis) {
+  const ids = [...vis].sort();
+  const gen = id => P.get(id).gen;
+  const ve = E.filter(e => vis.has(e.a) && vis.has(e.b) && edgeShown(e));
+  // блоки: супруги и «возможно, одно лицо» в одном колене стоят рядом
+  const parent = new Map(ids.map(i => [i, i]));
+  const find = x => parent.get(x) === x ? x : (parent.set(x, find(parent.get(x))), parent.get(x));
+  const sameRow = ve.filter(e => (e.t === 'spouse' || e.t === 'identity') && gen(e.a) === gen(e.b));
+  for (const e of sameRow) parent.set(find(e.a), find(e.b));
+  const groups = new Map();
+  for (const i of ids) { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(i); }
+  const adjRow = new Map(ids.map(i => [i, []]));
+  for (const e of sameRow) { adjRow.get(e.a).push(e); adjRow.get(e.b).push(e); }
+  const units = [];
+  for (const mem of groups.values()) units.push({ mem: orderUnit(mem, adjRow), gen: gen(mem[0]) });
+  const unitOf = new Map();
+  for (const u of units) { u.w = u.mem.length * CW + (u.mem.length - 1) * SG; u.mem.forEach((m, i) => { unitOf.set(m, u); u['o' + m] = -u.w / 2 + CW / 2 + i * (CW + SG); }); }
+  const off = id => unitOf.get(id)['o' + id];
+
+  // подсказка X: родословная от корня (отец слева, мать справа), остальные — по уже размещённым родственникам
+  const hint = new Map();
+  const root = D.meta.root;
+  const parentsOf = id => ve.filter(e => e.t === 'parent' && e.b === id).map(e => e.a)
+    .sort((a, b) => (P.get(a).sex === 'F') - (P.get(b).sex === 'F') || a.localeCompare(b));
+  if (vis.has(root)) {
+    const q = [[root, 0, 1]]; hint.set(root, 0);
+    while (q.length) {
+      const [id, x, w] = q.shift();
+      const ps = parentsOf(id).filter(p => !hint.has(p));
+      ps.forEach((p, i) => { const px = x - w / 2 + w / ps.length * (i + .5); hint.set(p, px); q.push([p, px, w / ps.length]); });
+    }
+  }
+  const lineHint = new Map();
+  for (const l of D.lines) for (const f of l.focus) if (hint.has(f)) lineHint.set(l.id, hint.get(f));
+  let changed = true, guard = 0;
+  while (changed && guard++ < 50) {
+    changed = false;
+    for (const id of ids) {
+      if (hint.has(id)) continue;
+      const hs = [];
+      for (const e of nb.get(id)) { const o = other(e, id); if (vis.has(o) && hint.has(o)) hs.push(hint.get(o)); }
+      if (hs.length) { hint.set(id, hs.reduce((a, b) => a + b, 0) / hs.length + (id.localeCompare(root) * 1e-4)); changed = true; }
+    }
+    if (!changed) {
+      const rest = ids.filter(i => !hint.has(i));
+      if (rest.length) {
+        // без видимых связей: к своей семье (фамилия по рождению), ближе к своему колену; нет семьи — к линии поиска
+        const p = P.get(rest[0]);
+        const kin = ids.filter(i => hint.has(i) && p.fam && P.get(i).fam === p.fam);
+        const near = kin.filter(i => Math.abs(gen(i) - p.gen) <= 1);
+        const fh = (near.length ? near : kin).map(i => hint.get(i));
+        const lh = lineHint.has(p.line) ? lineHint.get(p.line) : 0;
+        hint.set(rest[0], fh.length ? fh.reduce((a, b) => a + b, 0) / fh.length : lh + (lh < 0 ? -0.6 : 0.6)); changed = true;
+      }
+    }
+  }
+  const rows = new Map();
+  for (const u of units) { if (!rows.has(u.gen)) rows.set(u.gen, []); rows.get(u.gen).push(u); }
+  const directPerRow = new Map();
+  for (const id of ids) if (P.get(id).direct) directPerRow.set(gen(id), (directPerRow.get(gen(id)) || 0) + 1);
+  const W = Math.max(900, Math.max(0, ...directPerRow.values()) * (CW + GAP + SG));
+  for (const u of units) { u.h = u.mem.reduce((s, m) => s + hint.get(m), 0) / u.mem.length * W; u.x = u.h; }
+
+  // связи для притяжения между коленами
+  const links = new Map(units.map(u => [u, []]));
+  for (const e of ve) {
+    const ua = unitOf.get(e.a), ub = unitOf.get(e.b);
+    if (ua === ub) continue;
+    const w = e.t === 'parent' ? (P.get(e.a).direct && P.get(e.b).direct ? 3 : 1.5) : e.t === 'sibling' ? .6 : .4;
+    links.get(ua).push([ub, off(e.b) - off(e.a), w]); links.get(ub).push([ua, off(e.a) - off(e.b), w]);
+  }
+  // семья — один куст: блок тянется к середине своей семьи (по всем коленам); одиночки без связей — сильнее;
+  // выбранная в фильтре семья — сильно и сплошным отрезком в каждом ряду
+  const famsOf = new Map(), famUnits = new Map();
+  for (const u of units) {
+    const fs = [...new Set(u.mem.map(m => P.get(m).fam).filter(Boolean))];
+    famsOf.set(u, fs);
+    for (const f of fs) { if (!famUnits.has(f)) famUnits.set(f, []); famUnits.get(f).push(u); }
+  }
+  const pick = S.famMode && S.famFilter;
+  const famW = (u, f) => f === pick ? 4 : links.get(u).length ? FAMW : 1;
+  // середина семьи: ближние колена весят больше (брат — рядом с братьями, а не с внуками)
+  const famCenter = (u, f) => {
+    let s = 0, w = 0;
+    for (const v of famUnits.get(f)) if (v !== u) { const k = 1 / (1 + 2 * Math.abs(v.gen - u.gen)); s += v.x * k; w += k; }
+    return w ? s / w : null;
+  };
+  const gensSorted = [...rows.keys()].sort((a, b) => a - b);
+  const inPick = u => pick && famsOf.get(u).includes(pick);
+  // выбранная семья в ряду — сплошной плотный блок вокруг своей середины
+  const packPick = row => {
+    const pk = row.filter(inPick);
+    if (pk.length < 2) return;
+    const mid = pk.reduce((a, u) => a + u.d, 0) / pk.length;
+    const tot = pk.reduce((a, u) => a + u.w, 0) + GAP * (pk.length - 1);
+    let x = mid - tot / 2;
+    for (const u of pk) { u.d = x + u.w / 2; x += u.w + GAP; }
+  };
+  // сначала связанные блоки (одиночки не раздвигают семьи), затем одиночки — к краю куста своей семьи
+  const loose = u => !links.get(u).length;
+  const lrows = new Map(gensSorted.map(g => [g, rows.get(g).filter(loose)]));
+  for (const g of gensSorted) rows.set(g, rows.get(g).filter(u => !loose(u)));
+  for (const u of units) if (loose(u)) u.x = u.h;
+  for (let it = 0; it < 40; it++) {
+    const order = it % 2 ? [...gensSorted].reverse() : gensSorted;
+    for (const g of order) {
+      const row = rows.get(g);
+      for (const u of row) {
+        let s = u.h * .15, ws = .15;
+        for (const [v, d, w] of links.get(u)) { s += (v.x + d) * w; ws += w; }
+        for (const f of famsOf.get(u)) { const c = famCenter(u, f); if (c !== null) { const w = famW(u, f); s += c * w; ws += w; } }
+        u.d = s / ws;
+      }
+      if (it < 24) {
+        // боковая родня — с внешней стороны своего человека прямой линии: родня левого супруга левее пары, правого — правее
+        const side = new Map(), axis = unitOf.has(root) ? unitOf.get(root).x : 0;
+        const dirs = row.filter(v => v.mem.some(m => P.get(m).direct));
+        for (const u of row) {
+          if (u.mem.some(m => P.get(m).direct)) continue;
+          let best = null;
+          for (const v of dirs) v.mem.forEach((m, i) => {
+            if (!P.get(m).direct || !famsOf.get(u).includes(P.get(m).fam)) return;
+            const sd = v.mem.length > 1 ? (i === 0 ? -1 : i === v.mem.length - 1 ? 1 : 0) : (v.x < axis ? -1 : 1);
+            if (sd && (!best || Math.abs(v.d - u.d) < Math.abs(best[0].d - u.d))) best = [v, sd];
+          });
+          if (best) side.set(u, best[1] < 0 ? Math.min(u.d, best[0].d - 1) : Math.max(u.d, best[0].d + 1));
+        }
+        const pk = row.filter(inPick), mid = pk.length ? pk.reduce((a, u) => a + u.d, 0) / pk.length : 0;
+        const key = u => inPick(u) ? mid + u.d * 1e-6 : side.has(u) ? side.get(u) : u.d;
+        row.sort((a, b) => key(a) - key(b) || a.mem[0].localeCompare(b.mem[0]));
+      }
+      packPick(row);
+      pav(row);
+    }
+  }
+  for (const g of gensSorted) {
+    const row = rows.get(g), add = lrows.get(g);
+    if (!add.length) continue;
+    for (const u of row) u.d = u.x;
+    for (const u of add) {
+      const fs = famsOf.get(u), f = fs.includes(pick) ? pick : fs[0];
+      const c = f ? famCenter(u, f) : null;
+      u.d = c !== null ? c : u.h;
+      // в своём ряду есть родня по фамилии — встать сразу за её крайней карточкой со стороны цели
+      const kin = f ? row.filter(v => famsOf.get(v).includes(f)) : [];
+      if (kin.length) {
+        const lo = kin.reduce((m, v) => v.x < m.x ? v : m), hi = kin.reduce((m, v) => v.x > m.x ? v : m);
+        // с внешней стороны куста (дальше от прямой линии), чтобы не раздвигать прямую линию
+        const axis = unitOf.has(root) ? unitOf.get(root).x : (lo.x + hi.x) / 2;
+        u.d = (lo.x + hi.x) / 2 < axis ? lo.x - 1 - u.d * 1e-6 : hi.x + 1 + u.d * 1e-6;
+      }
+    }
+    // в режиме фильтра чужие одиночки не встают внутрь выбранной семьи
+    const pk = row.filter(inPick);
+    if (pk.length) {
+      const plo = Math.min(...pk.map(v => v.x)), phi = Math.max(...pk.map(v => v.x));
+      for (const u of add) if (!inPick(u) && u.d > plo - 1 && u.d < phi + 1) u.d = u.d - plo < phi - u.d ? plo - 2 - u.d * 1e-6 : phi + 2 + u.d * 1e-6;
+    }
+    const all = [...row, ...add].sort((a, b) => a.d - b.d || a.mem[0].localeCompare(b.mem[0]));
+    pav(all); rows.set(g, all);
+  }
+  // досчёт без перестановок: связанные блоки снова подтягиваются к родне после вставки одиночек
+  for (let it = 0; it < 24; it++) {
+    const order = it % 2 ? [...gensSorted].reverse() : gensSorted;
+    for (const g of order) {
+      const row = rows.get(g);
+      for (const u of row) {
+        if (loose(u)) continue;
+        let s = u.h * .15, ws = .15;
+        for (const [v, d, w] of links.get(u)) { s += (v.x + d) * w; ws += w; }
+        for (const f of famsOf.get(u)) { const c = famCenter(u, f); if (c !== null) { const w = famW(u, f); s += c * w; ws += w; } }
+        u.d = s / ws;
+      }
+      // одиночка держится вплотную к соседу по ряду (с внешней стороны куста), не раздвигая связанных
+      row.forEach((u, i) => {
+        if (!loose(u)) return;
+        if (i && (!loose(row[i - 1]) || row[i - 1].d !== undefined)) { u.d = row[i - 1].d + (row[i - 1].w + u.w) / 2 + GAP; return; }
+        let j = i, acc = 0;
+        while (j < row.length && loose(row[j])) { acc += (row[j].w + (row[j + 1] || row[j]).w) / 2 + GAP; j++; }
+        u.d = j < row.length ? row[j].d - acc : u.x;
+      });
+      packPick(row);
+      pav(row);
+    }
+  }
+  const pos = new Map();
+  let minX = Infinity;
+  for (const u of units) for (const m of u.mem) minX = Math.min(minX, u.x + off(m) - CW / 2);
+  for (const u of units) for (const m of u.mem) pos.set(m, { x: u.x + off(m) - CW / 2 - minX + 160, y: (u.gen - minGen) * ROW + 40 });
+  return { pos, ve, unitOf };
+}
+function orderUnit(mem, adjRow) {
+  if (mem.length === 1) return mem;
+  const linked = m => adjRow.get(m).filter(e => mem.includes(other(e, m)));
+  const center = [...mem].sort((a, b) => linked(b).length - linked(a).length || (P.get(b).direct - P.get(a).direct) || a.localeCompare(b))[0];
+  const near = [...new Map(linked(center).map(e => [other(e, center), e])).entries()]
+    .sort(([a, ea], [b, eb]) => (ea.t === 'identity') - (eb.t === 'identity') || a.localeCompare(b));
+  let out;
+  if (near.length === 1) {
+    const [m, e] = near[0];
+    out = e.t === 'spouse' && P.get(center).sex === 'F' ? [m, center] : [center, m];
+  } else {
+    const left = near.filter((x, i) => i % 2).map(x => x[0]).reverse(), right = near.filter((x, i) => !(i % 2)).map(x => x[0]);
+    out = [...left, center, ...right];
+  }
+  for (const m of mem) if (!out.includes(m)) {
+    const link = linked(m).map(e => other(e, m)).find(x => out.includes(x));
+    const i = link ? out.indexOf(link) : out.length - 1;
+    i >= out.indexOf(center) ? out.splice(i + 1, 0, m) : out.splice(i, 0, m);
+  }
+  return out;
+}
+// изотоническая регрессия: блоки как можно ближе к желаемым X без наложений и с сохранением порядка
+function pav(row) {
+  const c = []; let acc = 0;
+  row.forEach((u, i) => { if (i) acc += (row[i - 1].w + u.w) / 2 + GAP; c.push(acc); });
+  const blocks = [];
+  row.forEach((u, i) => {
+    blocks.push({ s: u.d - c[i], n: 1, i0: i });
+    while (blocks.length > 1) {
+      const b = blocks[blocks.length - 1], a = blocks[blocks.length - 2];
+      if (a.s / a.n <= b.s / b.n) break;
+      a.s += b.s; a.n += b.n; blocks.pop();
+    }
+  });
+  for (const b of blocks) for (let k = 0; k < b.n; k++) row[b.i0 + k].x = b.s / b.n + c[b.i0 + k];
 }
 
-function srcLine(id){const s=D.src[id]; if(!s)return esc(id);
-  const ref=[s.repository,s.reference].filter(Boolean).join(", ");
-  const t=`${esc(s.id)} — ${esc(s.title)}${ref?` (${esc(ref)})`:""}`;
-  return s.url&&/^https?:/.test(s.url)?`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${t}</a>`:t;}
-function chip(st){return `<span class="chip ${esc(st)}">${esc(L.cs[st]||st)}</span>`}
-
-function open(id,keep){
-  selected=id; const p=D.byId[id]; if(!p)return;
-  if(location.hash!=="#"+id)history.replaceState(null,"","#"+id);
-  document.querySelectorAll(".card").forEach(c=>c.classList.toggle("sel",c.dataset.id===id));
-  const name=i=>D.byId[i]?`<a href="#" data-go="${esc(i)}">${esc(D.byId[i].label)}</a>`:esc(i);
-  const claims=D.claims.filter(c=>c.subjects.includes(id));
-  const rels=D.relationships.filter(r=>r.a===id||r.b===id).map(r=>{
-    const other=r.a===id?r.b:r.a; let role=L.other;
-    if(r.type==="parent-of")role=r.a===id?L.parentOf:L.childOf; if(r.type==="spouse-of")role=L.spouse; if(r.type==="sibling-of")role=L.sibling;
-    const who=r.type==="parent-of"?(r.a===id?L.childOf:L.parentOf):role;
-    return `<div class="claim">${who}: ${name(other)} ${chip(r.status)}${r.sources.length?`<div class="src">${L.sources}: ${r.sources.map(srcLine).join("; ")}</div>`:""}${r.rationale?`<div class="meta">${esc(r.rationale)}</div>`:""}</div>`}).join("");
-  const hy=(D.hypotheses||[]).filter(h=>h.persons.includes(id)).map(h=>`<div class="claim">${chip("hypothesis")} ${esc(h.statement)}</div>`).join("");
-  const life=p.living==="living"?L.living:(p.living==="unknown"?L.unknownLiving:"");
-  $("#panel").innerHTML=`<button class="close" aria-label="${L.close}">✕</button><h2>${esc(p.label)}</h2>
-    <div class="muted">${esc([p.birth_h&&"* "+p.birth_h,p.death_h&&"† "+p.death_h,life].filter(Boolean).join(" · "))}</div>
-    <div style="margin-top:6px"><span class="chip">${esc(L.st[p.status]||p.status)}</span><span class="chip">${esc(p.id)}</span></div>
-    ${p.variants.length?`<h3>${L.variants}</h3>${p.variants.map(esc).join("; ")}`:""}
-    ${p.places.length?`<h3>${L.places}</h3>${p.places.map(esc).join("; ")}`:""}
-    <h3>${L.claims}</h3>${claims.map(c=>`<div class="claim">${chip(c.status)} ${esc(c.statement)}
-      <div class="meta">${esc([c.date_h,c.place].filter(Boolean).join(" · "))}${c.rationale?` — ${esc(c.rationale)}`:""}</div>
-      ${c.sources.length?`<div class="src">${L.sources}: ${c.sources.map(srcLine).join("; ")}</div>`:""}
-      ${c.against.length?`<div class="src against">${L.against}: ${c.against.map(srcLine).join("; ")}</div>`:""}
-      ${c.competing.length?`<div class="compete">↔ ${L.competing}: ${c.competing.map(i=>esc(i+" "+(D.claimById[i]?.date_h||""))).join("; ")}</div>`:""}
-      </div>`).join("")||`<div class="muted">${L.noClaims}</div>`}
-    ${rels?`<h3>${L.rels}</h3>${rels}`:""}${hy?`<h3>${L.hyps}</h3>${hy}`:""}
-    ${D.meta.feedback?`<h3>${L.fb.title}</h3><form id="fb" class="claim">
-      <label>${L.fb.name}<br><input name="author_name" required maxlength="200" style="width:100%"></label><br>
-      <label>${L.fb.email}<br><input name="author_email" type="email" maxlength="320" style="width:100%"></label><br>
-      <label>${L.fb.text}<br><textarea name="text" required maxlength="5000" rows="5" style="width:100%"></textarea></label><br>
-      <label><input type="checkbox" name="consent" required> ${L.fb.consent}</label><br>
-      <button type="submit">${L.fb.send}</button> <span id="fbmsg" class="muted" role="status"></span></form>`:""}`;
-  $("#panel").classList.add("open");
-  $("#panel .close").onclick=closePanel;
-  $("#panel").querySelectorAll("[data-go]").forEach(a=>a.onclick=e=>{e.preventDefault();open(a.dataset.go)});
-  const fb=$("#fb"); if(fb)fb.onsubmit=async e=>{e.preventDefault(); const f=new FormData(fb), msg=$("#fbmsg");
-    const body={person_id:id,author_name:f.get("author_name"),author_email:f.get("author_email"),text:f.get("text"),consent:f.get("consent")==="on"};
-    try{const r=await fetch("api/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-      const j=await r.json(); if(r.ok){msg.textContent=L.fb.ok(j.id);fb.reset()}else msg.textContent=L.fb.err+(j.error||r.status)}
-    catch(err){msg.textContent=L.fb.err+err.message}};
-  if(!keep){const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);c&&c.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"})}
+/* ---------- отрисовка ---------- */
+let VIS = new Set(), LAY = null, anim = 0;
+// страховка: принудительно показанный человек без видимых связей получает цепочку родства до видимых
+function linkForced() {
+  for (let i = 0; i < 3; i++) {
+    const loose = [...S.forced].filter(id => VIS.has(id) && !baseVisibleCore(P.get(id)) &&
+      !nb.get(id).some(e => edgeShown(e) && VIS.has(other(e, id))) && nb.get(id).some(e => STRUCT.has(e.t) && edgeShown(e)));
+    if (!loose.length) return;
+    loose.forEach(id => { S.forced.delete(id); VIS = computeVisible(); revealPath(id); });
+    VIS = computeVisible();
+  }
 }
-function closePanel(){selected=null;history.replaceState(null,"",location.pathname+location.search);$("#panel").classList.remove("open");document.querySelectorAll(".card.sel").forEach(c=>c.classList.remove("sel"))}
+function relayout(anchorId, animate = true) {
+  VIS = computeVisible();
+  linkForced();
+  const before = anchorId && S.pos.get(anchorId);
+  const old = S.pos;
+  LAY = layout(VIS);
+  if (before && LAY.pos.has(anchorId)) {
+    const dx = before.x - LAY.pos.get(anchorId).x;
+    for (const q of LAY.pos.values()) q.x += dx;
+  }
+  buildCards();
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!animate || reduce) { S.pos = LAY.pos; place(1, old); return; }
+  const t0 = performance.now(), id = ++anim;
+  const step = now => {
+    if (id !== anim) return;
+    const t = Math.min(1, (now - t0) / 320), k = 1 - Math.pow(1 - t, 3);
+    place(k, old);
+    if (t < 1) requestAnimationFrame(step); else S.pos = LAY.pos;
+  };
+  requestAnimationFrame(step);
+}
+function lerpPos(id, k, old) {
+  const n = LAY.pos.get(id), o = old.get(id) || n;
+  return { x: o.x + (n.x - o.x) * k, y: o.y + (n.y - o.y) * k };
+}
+let cardEls = new Map(), chipEls = [];
+function buildCards() {
+  const world = $('world');
+  for (const [id, el] of cardEls) if (!VIS.has(id)) { el.remove(); cardEls.delete(id); }
+  for (const id of VIS) {
+    let el = cardEls.get(id);
+    if (!el) { el = document.createElement('div'); el.dataset.id = id; world.insertBefore(el, $('edges-top')); cardEls.set(id, el); }
+    el.innerHTML = cardHTML(P.get(id));
+    const p = P.get(id), line = p.line && LN.get(p.line), focus = line && line.focus.includes(id);
+    el.className = 'card ' + p.sex + (CAND.has(p.cand) ? ' cand' : '') + (p.cand === 'unlikely' ? ' unlikely' : '') +
+      (S.sel === id ? ' sel' : '') + (id === D.meta.root ? ' root' : '') + (focus ? ' focus' : '');
+    el.style.setProperty('--lc', line ? line.color : 'transparent');
+    if (S.famMode) {
+      const dim = S.famFilter && p.fam !== S.famFilter;
+      el.classList.add('fam'); el.classList.toggle('famdim', !!dim);
+      el.style.setProperty('--fc', !dim && FAMCOL[p.fam] || 'var(--sexu)');
+    }
+  }
+  chipEls.forEach(c => c.remove()); chipEls = [];
+}
+function cardHTML(p) {
+  const line = p.line && LN.get(p.line);
+  const flag = line && line.focus.includes(p.id) ? `<span class="flag">${esc(line.state)}</span>` : '';
+  if (p.hidden) return `${flag}<div class="nm">Живой человек</div>`;
+  const yr = (d, pre) => d ? `<span class="${d.conflict ? 'warn' : d.ok ? 'ok' : ''}">${pre}${esc(d.t)}${d.ok ? '<span class="ok-mark">✓</span>' : ''}${d.conflict ? ' ⚠' : ''}</span>` : '';
+  let years = '';
+  if (p.b && p.d) years = yr(p.b, '') + ' – ' + yr(p.d, '');
+  else if (p.b) years = yr(p.b, p.living === 'possibly-living' ? 'р. ' : '') + (p.living === 'deceased' ? ' – ?' : '');
+  else if (p.d) years = yr(p.d, '† ');
+  const badges = [];
+  if (p.docs) badges.push(`<b>✓ ${p.docs} док.</b>`);
+  if (CAND.has(p.cand)) badges.push('<i>кандидат</i>');
+  else if (p.cand === 'family-reported') badges.push('со слов семьи');
+  const n = hiddenCount(p.id, VIS), ex = S.expanded.has(p.id);
+  const btn = ex ? `<button class="ex" data-ex="${p.id}" title="Свернуть родню" aria-label="Свернуть родню">−</button>`
+    : n ? `<button class="ex" data-ex="${p.id}" title="Показать родню: ${n}" aria-label="Показать родню: ${n}">+${n}</button>` : '';
+  return `${flag}<div class="nm${p.nameOk ? ' ok' : ''}">${esc(p.name)}${p.nameOk ? '<span class="ok-mark">✓</span>' : ''}</div>
+    <div class="yr">${years || '&nbsp;'}</div><div class="pl${p.place?.ok ? ' ok' : ''}">${esc(p.place?.t || '')}</div>
+    <div class="bd">${badges.join(' · ')}</div>${btn}`;
+}
+function place(k, old) {
+  const cur = new Map();
+  for (const id of VIS) cur.set(id, lerpPos(id, k, old));
+  for (const [id, el] of cardEls) { const q = cur.get(id); el.style.transform = `translate(${q.x}px,${q.y}px)`; }
+  drawEdges(cur, k === 1);
+  drawGens();
+  highlight();
+}
+const LV_ORDER = ['doc2', 'doc1', 'family', 'research', 'rejected'];
+const pc = ids => ids.map(i => 'p-' + i).join(' ');
+// брак расторгнут: крестик вместо колец
+const xmark = (x, y, ids) => `<path class="xmark ${pc(ids)}" d="M${x - 6},${y - 6} L${x + 6},${y + 6} M${x + 6},${y - 6} L${x - 6},${y + 6}"/>`;
+function drawEdges(cur, withChips) {
+  const svg = $('edges'), top = $('edges-top');
+  let maxX = 0;
+  const maxY = (maxGen - minGen + 1) * ROW + 80;
+  for (const q of cur.values()) maxX = Math.max(maxX, q.x + CW + 200);
+  for (const el of [svg, top]) { el.setAttribute('width', maxX); el.setAttribute('height', maxY); }
+  const out = [], over = ['<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>'];
+  const chips = [];
+  for (let g = minGen; g <= maxGen; g++) if ((g - minGen) % 2 === 0) out.push(`<rect class="band" x="-100000" y="${(g - minGen) * ROW + 40 - (ROW - CH) / 2}" width="200000" height="${ROW}"/>`);
+  const ve = LAY.ve;
+  const adjacent = (a, b) => LAY.unitOf.get(a) === LAY.unitOf.get(b) && Math.abs(cur.get(a).x - cur.get(b).x) <= CW + SG + 1 && cur.get(a).y === cur.get(b).y;
+  const rowGap = (p, c) => cur.get(c).y - cur.get(p).y;
+
+  // семьи «родители → дети»: ствол от пары, шина над детьми, спуск к каждому ребёнку
+  const fams = new Map(), odd = [];
+  for (const e of ve) {
+    if (e.t !== 'parent') continue;
+    const gap = rowGap(e.a, e.b);
+    if (gap < ROW / 2 || gap > ROW * 1.5) { odd.push(e); continue; }
+    const ps = ve.filter(f => f.t === 'parent' && f.b === e.b && Math.abs(rowGap(f.a, f.b) - gap) < 1).map(f => f.a).sort();
+    const key = ps.join('+');
+    if (!fams.has(key)) fams.set(key, { ps, kids: new Map() });
+    const f = fams.get(key);
+    if (!f.kids.has(e.b)) f.kids.set(e.b, []);
+    f.kids.get(e.b).push(e);
+  }
+  // уровни шин: семьи с пересекающимися шинами в одной строке получают разные уровни
+  const byRow = new Map();
+  for (const f of fams.values()) {
+    if (f.ps.length === 2 && adjacent(f.ps[0], f.ps[1])) {
+      const [a, b] = f.ps.map(id => cur.get(id)).sort((u, v) => u.x - v.x);
+      f.origins = [[(a.x + CW + b.x) / 2, a.y + CH / 2 + 7]];
+    } else f.origins = f.ps.map(id => [cur.get(id).x + CW / 2, cur.get(id).y + CH]);
+    const kx = [...f.kids.keys()].map(k => cur.get(k).x + CW / 2);
+    const xs = [...kx, ...f.origins.map(o => o[0])];
+    f.l = Math.min(...xs); f.r = Math.max(...xs);
+    f.cy = cur.get([...f.kids.keys()][0]).y;
+    if (!byRow.has(f.cy)) byRow.set(f.cy, []);
+    byRow.get(f.cy).push(f);
+  }
+  for (const list of byRow.values()) {
+    const ends = [];
+    list.sort((a, b) => a.l - b.l || a.r - b.r);
+    for (const f of list) {
+      let t = ends.findIndex(x => x < f.l - 14);
+      if (t < 0) { t = ends.length; ends.push(0); }
+      ends[t] = f.r; f.track = Math.min(t, 7);
+    }
+  }
+  for (const f of fams.values()) {
+    const busY = f.cy - 16 - f.track * 9;
+    const all = [...f.kids.values()].flat();
+    const count = new Map(); all.forEach(e => count.set(e.lv, (count.get(e.lv) || 0) + 1));
+    const main = [...count].sort((a, b) => b[1] - a[1] || LV_ORDER.indexOf(a[0]) - LV_ORDER.indexOf(b[0]))[0][0];
+    const ids = [...f.ps, ...f.kids.keys()];
+    for (const [ox, oy] of f.origins) out.push(`<path class="e-${main} ${pc(ids)}" d="M${ox},${oy} V${busY}"/>`);
+    if (f.r - f.l > 1) out.push(`<path class="e-${main} ${pc(ids)}" d="M${f.l},${busY} H${f.r}"/>`);
+    for (const [kid, es] of f.kids) {
+      const c = cur.get(kid), cx = c.x + CW / 2;
+      const lvs = [...new Set(es.map(e => e.lv))];
+      lvs.forEach((lv, i) => {
+        const dx = lvs.length > 1 ? (i ? 3 : -3) : 0;
+        out.push(`<path class="e-${lv} ${pc([...f.ps, kid])}" d="M${cx + dx},${busY} V${c.y}"/>`);
+      });
+      for (const e of es) if (e.lv === 'research' || e.lv === 'rejected') chips.push([e, cx, c.y - 8]);
+    }
+  }
+  // родитель и ребёнок не в соседних строках (разные поколения в браке): дуга со стрелкой поверх карточек
+  for (const e of odd) {
+    const a = cur.get(e.a), b = cur.get(e.b);
+    const x1 = a.x + CW / 2, x2 = b.x + CW / 2;
+    let d;
+    if (Math.abs(a.y - b.y) < 1) { const y = a.y + CH, dip = y + 34; d = `M${x1},${y} C${x1},${dip} ${x2},${dip} ${x2},${y}`; chips.push([e, (x1 + x2) / 2, dip - 8, 'родитель → ребёнок']); }
+    else if (b.y < a.y) d = `M${x1},${a.y} C${x1},${a.y - 60} ${x2},${b.y + CH + 60} ${x2},${b.y + CH}`;
+    else d = `M${x1},${a.y + CH} C${x1},${a.y + CH + 60} ${x2},${b.y - 60} ${x2},${b.y}`;
+    over.push(`<path class="e-${e.lv} ${pc([e.a, e.b])}" marker-end="url(#arr)" d="${d}"/>`);
+    if (e.lv === 'research' || e.lv === 'rejected') chips.push([e, (x1 + x2) / 2, (a.y + b.y + CH) / 2]);
+  }
+  // супруги, «одно лицо», братья/сёстры, родство
+  for (const e of ve) {
+    if (e.t === 'parent') continue;
+    const a = cur.get(e.a), b = cur.get(e.b);
+    const [l, r] = a.x <= b.x ? [a, b] : [b, a];
+    const cls = (e.t === 'identity' && e.lv !== 'rejected' ? 'e-identity' : 'e-' + e.lv) + ' ' + pc([e.a, e.b]);
+    let mx, my;
+    if (Math.abs(a.y - b.y) < 1 && (e.t === 'spouse' || e.t === 'identity') && adjacent(e.a, e.b)) {
+      const y = l.y + CH / 2;
+      out.push(`<line class="${cls}" x1="${l.x + CW}" y1="${y}" x2="${r.x}" y2="${y}"/>`);
+      mx = (l.x + CW + r.x) / 2; my = y - 18;
+      if (e.t === 'spouse' && e.end?.kind === 'divorce') out.push(xmark(mx, y, [e.a, e.b]));
+      else if (e.t === 'spouse') {
+        const rc = 'ring' + (e.lv.startsWith('doc') ? ' doc' : '') + ' ' + pc([e.a, e.b]);
+        out.push(`<circle class="${rc}" cx="${mx - 3.5}" cy="${y}" r="5"/><circle class="${rc}" cx="${mx + 3.5}" cy="${y}" r="5"/>`);
+      }
+    } else if (Math.abs(a.y - b.y) < 1) {
+      const t = l.y - 7;
+      out.push(`<path class="${cls}" d="M${l.x + CW / 2},${l.y} V${t} H${r.x + CW / 2} V${r.y}"/>`);
+      mx = (l.x + r.x + CW) / 2; my = t;
+      if (e.t === 'spouse' && e.end?.kind === 'divorce') out.push(xmark(mx, t, [e.a, e.b]));
+    } else {
+      const [u, d] = a.y < b.y ? [a, b] : [b, a];
+      const x1 = u.x + CW / 2, y1 = u.y + CH, x2 = d.x + CW / 2, y2 = d.y;
+      over.push(`<path class="${cls}" d="M${x1},${y1} C${x1},${(y1 + y2) / 2} ${x2},${(y1 + y2) / 2} ${x2},${y2}"/>`);
+      mx = (x1 + x2) / 2; my = (y1 + y2) / 2;
+    }
+    if (e.lv === 'research' || e.lv === 'rejected' || e.t === 'identity') chips.push([e, mx, my]);
+  }
+  svg.innerHTML = out.join('');
+  top.innerHTML = over.join('');
+  chipEls.forEach(c => c.remove()); chipEls = [];
+  if (!withChips) return;
+  for (const [e, x, y, text] of chips) {
+    const b = document.createElement('button');
+    const rej = e.lv === 'rejected';
+    b.className = 'chip' + (rej ? ' rej' : '');
+    const label = text || (rej ? 'отброшено' : e.t === 'identity' ? 'одно лицо?' : (e.need ? 'нужно: ' + e.need : T_NAME[e.t] + '?'));
+    b.textContent = label; b.title = (rej ? e.reason : e.need) || e.why || '';
+    b.style.transform = `translate(${x}px,${y}px) translate(-50%,-50%)`;
+    b.onclick = ev => { ev.stopPropagation(); showEdge(e); };
+    $('world').appendChild(b); chipEls.push(b);
+  }
+}
+// подсветка линий одного человека: при наведении на карточку и для выбранного
+let hoverId = null;
+function highlight() {
+  const sel = S.sel && VIS.has(S.sel) ? S.sel : null;
+  $('world').classList.toggle('hl', !!hoverId);
+  $('hlstyle').textContent = (sel ? `#world .p-${sel} { stroke-width: 3.4px; }` : '') +
+    (hoverId ? `#world.hl .p-${hoverId} { opacity: 1 !important; stroke-width: 3.4px; }` : '');
+}
+function drawGens() {
+  const box = $('gens'), v = S.view, out = [];
+  for (let g = minGen; g <= maxGen; g++) {
+    const info = D.gens[g]; if (!info) continue;
+    const y = v.y + ((g - minGen) * ROW + 40 - (ROW - CH) / 2) * v.k + 4;
+    if (y < -60 || y > innerHeight) continue;
+    const band = ROW * v.k;  // мелкий масштаб: сначала без годов, потом без подписей — чтобы не наезжали друг на друга
+    if (band < 22) continue;
+    out.push(`<div class="glab" style="top:${y}px"><b>${esc(info.name)}</b>${band >= 46 ? `<span>≈${info.from}–${info.to}</span>` : ''}</div>`);
+  }
+  box.innerHTML = out.join('');
+}
+
+/* ---------- камера ---------- */
+function applyView() { const v = S.view; $('world').style.transform = `translate(${v.x}px,${v.y}px) scale(${v.k})`; drawGens(); }
+function zoomAt(f, cx, cy) {
+  const v = S.view, k = Math.min(2.5, Math.max(0.12, v.k * f));
+  v.x = cx - (cx - v.x) * (k / v.k); v.y = cy - (cy - v.y) * (k / v.k); v.k = k; applyView();
+}
+function area() {
+  const p = $('panel').getBoundingClientRect(), narrow = innerWidth <= 760;
+  return { w: narrow ? innerWidth : innerWidth - p.width, h: narrow ? innerHeight - ($('panel').classList.contains('min') ? 50 : p.height) : innerHeight, top: 56 };
+}
+function fit(animate = true, only = null) {
+  const ps = only ? only.map(id => LAY.pos.get(id)).filter(Boolean) : [...LAY.pos.values()]; if (!ps.length) return;
+  const x0 = Math.min(...ps.map(p => p.x)), x1 = Math.max(...ps.map(p => p.x)) + CW;
+  const y0 = Math.min(...ps.map(p => p.y)) - 30, y1 = Math.max(...ps.map(p => p.y)) + CH;
+  const a = area(), k = Math.min(1.1, (a.w - 150) / (x1 - x0), (a.h - a.top - 40) / (y1 - y0));
+  S.view.k = Math.max(0.12, k); S.view.x = 130 + (a.w - 130 - (x1 - x0) * S.view.k) / 2 - x0 * S.view.k;
+  S.view.y = a.top + (a.h - a.top - (y1 - y0) * S.view.k) / 2 - y0 * S.view.k; applyView();
+}
+// показать скрытого человека вместе с кратчайшей цепочкой родства до уже видимых людей
+function revealPath(id) {
+  const prev = new Map([[id, null]]), q = [id];
+  let hit = null;
+  while (q.length && !hit) {
+    const x = q.shift();
+    for (const e of nb.get(x)) {
+      if (!STRUCT.has(e.t) || !edgeShown(e)) continue;
+      const o = other(e, x);
+      if (prev.has(o)) continue;
+      prev.set(o, x);
+      if (VIS.has(o)) { hit = o; break; }
+      q.push(o);
+    }
+  }
+  for (let x = hit ? prev.get(hit) : id; x; x = prev.get(x)) S.forced.add(x);
+}
+function focusPerson(id, sel = true) {
+  if (!VIS.has(id)) { revealPath(id); relayout(null, false); }
+  const p = LAY.pos.get(id); if (!p) return;
+  const a = area(); S.view.k = Math.max(S.view.k, 0.85);
+  S.view.x = a.w / 2 - (p.x + CW / 2) * S.view.k; S.view.y = (a.top + a.h) / 2 - (p.y + CH / 2) * S.view.k; applyView();
+  if (sel) select(id);
+}
+
+/* ---------- панель ---------- */
+function select(id) {
+  S.sel = id; S.tab = 'person';
+  try { history.replaceState(null, '', '#' + id); } catch (e) {}
+  for (const [i, el] of cardEls) el.classList.toggle('sel', i === id);
+  highlight();
+  if (innerWidth <= 760) setMin(false);
+  renderPanel();
+}
+function pname(id) { const p = P.get(id); return p ? p.name : id; }
+function plink(id) { return `<button class="plink" data-go="${id}">${esc(pname(id))}</button>`; }
+function artLine(aid) {
+  const a = D.arts[aid]; if (!a) return '';
+  const ref = [a.repo, a.ref].filter(Boolean).join(', ');
+  return `<div class="src"><b>${esc(a.title)}</b>${ref ? '<br>' + esc(ref) : ''}${a.date ? ' · ' + esc(a.date) : ''}</div>`;
+}
+function renderPanel() {
+  $('t-search').classList.toggle('on', S.tab === 'search'); $('t-person').classList.toggle('on', S.tab === 'person');
+  $('pbody').innerHTML = S.tab === 'person' && S.sel ? personHTML(P.get(S.sel)) : searchHTML();
+  $('pbody').scrollTop = 0;
+}
+function searchHTML() {
+  const open = D.claims.filter(c => c.lv === 'hyp' || c.lv === 'open');
+  const out = [];
+  for (const l of D.lines) {
+    const hs = open.filter(c => c.line === l.id);
+    out.push(`<section class="line" style="--lc:${l.color}"><h4>${esc(l.title)}</h4>
+      <span class="state${/ждём/.test(l.state) ? ' wait' : ''}">${esc(l.state)}</span>
+      <div class="sub">${esc(l.where)}</div>
+      <div style="margin:6px 0">${l.focus.map(plink).join(', ')}</div>
+      ${hs.map(hypHTML).join('') || '<div class="sub">Открытых гипотез нет.</div>'}</section>`);
+  }
+  const restH = open.filter(c => !c.line);
+  if (restH.length) out.push(`<section class="line" style="--lc:var(--rule)"><h4>Прочее</h4>${restH.map(hypHTML).join('')}</section>`);
+  out.push(`<h3>Показ</h3>
+    <label class="chk"><input type="checkbox" id="c-rej" ${S.showRej ? 'checked' : ''}> Показать отброшенное</label>`);
+  if (S.showRej) {
+    const rej = D.claims.filter(c => c.lv === 'rejected');
+    out.push(`<h3>Отброшено</h3>` + rej.map(c => `<button class="hyp" data-go="${c.subj[0] || ''}"><span class="ht">${esc(c.text)}</span>
+      <span class="reason">${esc(c.why || '—')}</span></button>`).join(''));
+  }
+  out.push(`<div class="meta">Данные на ${esc(D.meta.asof)} · версия ${esc(D.meta.version)} · ${D.persons.length} чел., ${D.edges.length} связей</div>`);
+  return out.join('');
+}
+const ICON_DOC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h5"/></svg>';
+const ICON_EXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>';
+// значки ячейки: документы (галерея) и внешние ссылки; ключ — id утверждения или связи
+const DOCREF = new Map();
+function docIcons(key, title, docs, arts) {
+  const files = (docs || []).reduce((n, d) => n + d.f.length, 0);
+  const urls = [...new Set((arts || []).flatMap(a => (D.arts[a]?.urls || []).map(u => a + '\t' + u)))].map(x => x.split('\t'));
+  DOCREF.set(key, { title, docs: docs || [], urls });
+  return (files ? `<button class="ic" data-doc="${esc(key)}" title="Документы: ${files}" aria-label="Документы: ${files}">${ICON_DOC}${files > 1 ? `<span class="n">${files}</span>` : ''}</button>` : '') +
+    (urls.length ? `<button class="ic" data-ext="${esc(key)}" title="${urls.length > 1 ? 'Источники на внешних сайтах' : 'Открыть источник на внешнем сайте'}" aria-label="Внешний источник">${ICON_EXT}${urls.length > 1 ? `<span class="n">${urls.length}</span>` : ''}</button>` : '');
+}
+function cellHTML(key, title, docs, arts, body, extra = '', tag = 'div') {
+  const ic = docIcons(key, title, docs, arts);
+  if (!extra && /^C-\d{4}$/.test(key)) extra = ` id="cl-${key}"`;
+  return `<${tag} class="cell${ic ? ' has-icons' : ''}"${extra}>${ic ? `<div class="ficons">${ic}</div>` : ''}${body}</${tag}>`;
+}
+const sec = (title, body) => `<details class="sec" open><summary>${title}</summary>${body}</details>`;
+function hypHTML(c) {
+  const ic = docIcons(c.id, c.text, c.docs, c.arts);
+  return `<div class="hyp cell${ic ? ' has-icons' : ''}" role="button" tabindex="0" data-go="${c.subj.find(s => P.has(s)) || ''}">${ic ? `<div class="ficons">${ic}</div>` : ''}<span class="lv lv-${c.lv}">${LV_NAME[c.lv]}</span><span class="ht">${esc(c.text)}</span>
+    ${c.next ? `<span class="need">${esc(c.next)}</span>` : ''}</div>`;
+}
+function personHTML(p) {
+  if (p.hidden) return `<h2>Живой человек</h2><p class="sub">Данные живых людей на схеме не показываются.</p>`;
+  const dt = (d, pre) => d && pre + esc(d.t) + (d.ok ? ' <span class="ok-mark">✓ документ</span>' : '') + (d.raw !== d.t ? ` <span class="sub">(в записи: ${esc(d.raw)})</span>` : '');
+  const yrs = [dt(p.b, 'род. '), dt(p.d, 'смерть: ')].filter(Boolean).join('<br>');
+  const kv = [['Как в записи', p.written], ['Варианты', p.variants], ['Годы', yrs], ['Места', p.places], ['Юрисдикция', p.juris], ['Занятие', p.occ],
+    ['Вероисп.', p.conf], ['Статус', (CAND_NAME[p.cand] || p.cand) + ' · ' + (LIV_NAME[p.living] || p.living)], ['Родня по записям', p.reported]]
+    .filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${k === 'Годы' ? v : esc(v)}</dd>`).join('');
+  const facts = (p.claims || []).map(id => CL.get(id)).filter(Boolean)
+    .sort((a, b) => ['doc2', 'doc1', 'open', 'hyp', 'family', 'rejected'].indexOf(a.lv) - ['doc2', 'doc1', 'open', 'hyp', 'family', 'rejected'].indexOf(b.lv));
+  const rels = nb.get(p.id).filter(edgeShown).map(e => {
+    const o = other(e, p.id);
+    let role = T_NAME[e.t];
+    if (e.t === 'parent') role = e.a === p.id ? 'ребёнок' : 'родитель';
+    return cellHTML('e:' + e.id + ':' + e.a + ':' + e.b, `${role}: ${pname(o)}`, e.docs, e.arts, `<span class="lv lv-${e.lv}">${LV_NAME[e.lv]}</span>${role}: ${plink(o)}
+      ${e.end ? `<span class="ended">${e.end.kind === 'divorce' ? '✕ ' : ''}${esc(e.end.text)}</span>` : ''}
+      ${e.why ? `<div class="sub">${esc(e.why)}</div>` : ''}${e.need ? `<span class="need">${esc(e.need)}</span>` : ''}${e.reason ? `<span class="reason">${esc(e.reason)}</span>` : ''}`);
+  }).join('');
+  return `<h2>${esc(p.name)}</h2><div class="sub">${esc(p.full)}</div>
+    ${sec('Сведения', `<dl class="kv">${kv}</dl>`)}
+    ${facts.length ? sec('Факты и их подтверждение', facts.map(c => cellHTML(c.id, c.text, c.docs, c.arts, `<span class="lv lv-${c.lv}">${LV_NAME[c.lv]}</span>${esc(c.text)}
+      ${(c.lv === 'hyp' || c.lv === 'open') && c.next ? `<span class="need">${esc(c.next)}</span>` : ''}${c.lv === 'rejected' ? `<span class="reason">${esc(c.why)}</span>` : ''}`)).join('')) : ''}
+    ${rels ? sec('Связи', rels) : ''}
+    ${p.merge || p.notes ? sec('Заметки исследования', `<div class="sub">${esc([p.merge, p.notes].filter(Boolean).join(' · '))}</div>`) : ''}
+    ${sec('Источники (шифры)', (p.arts || []).map(artLine).join('') || '<div class="sub">Нет</div>')}
+    ${feedbackHTML(p)}`;
+}
+function feedbackHTML(p) {
+  const items = (D.feedback || []).filter(f => f.person === p.id || f.other === p.id).map(f => {
+    const about = f.kind === 'edge' ? ` · о связи: ${esc(f.relation)} — ${f.person === p.id ? plink(f.other) : plink(f.person)}`
+      : f.person !== p.id ? ` · о ${plink(f.person)}` : f.kind === 'other' ? ' · другое' : '';
+    return `<div class="fact"><span class="st st-${esc(f.status.split(' ')[0])}">${esc(f.status)}</span><span class="fbtext">${esc(f.text)}</span>
+      <div class="sub">${esc(f.author)}, ${esc(f.date)}${about} · ${esc(f.id)}</div></div>`;
+  }).join('');
+  const opts = nb.get(p.id).filter(edgeShown).map(e => {
+    const o = other(e, p.id);
+    const role = e.t === 'parent' ? (e.a === p.id ? 'ребёнок' : 'родитель') : T_NAME[e.t];
+    return `<option value="edge:${esc(e.id)}">связь: ${esc(role)} — ${esc(pname(o))}</option>`;
+  }).join('');
+  if (!D.meta.feedback) return items ? sec('Сведения семьи', items) : '';  // форма — только если включена в деле (приватная версия)
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('fb-author') || '{}'); } catch (e) {}
+  return sec('Сведения семьи', `${items || '<div class="sub">Принятых сведений пока нет. Если вы что-то знаете об этом человеке или его родных — напишите: сообщение появится здесь после проверки.</div>'}
+    <form class="fb" id="fb" data-person="${p.id}" novalidate>
+      <label for="fb-about">О ком или о чём</label>
+      <select id="fb-about"><option value="person">${esc(p.name)} — сам человек</option>${opts}
+        <option value="other">Другое: новый родственник, семейная история</option></select>
+      <label for="fb-text">Что вы знаете</label>
+      <textarea id="fb-text" maxlength="5000" placeholder="Даты, места, имена, кем приходился, откуда это известно: рассказ, документ, фото"></textarea>
+      <div class="fb-row">
+        <div><label for="fb-author">Ваше имя *</label><input id="fb-author" maxlength="100" autocomplete="name" value="${esc(saved.author || '')}"></div>
+        <div><label for="fb-email">E-mail *</label><input id="fb-email" type="email" maxlength="200" autocomplete="email" value="${esc(saved.email || '')}"></div>
+      </div>
+      <label class="chk"><input type="checkbox" id="fb-consent"> Согласен(на) на обработку моего имени и e-mail для работы над историей семьи</label>
+      <div class="note">Имя будет видно рядом с вашим сообщением. E-mail видит только исследователь — чтобы уточнить детали.</div>
+      <button class="btn primary" type="submit" id="fb-send">Отправить</button>
+      <div class="fb-msg" id="fb-msg" role="status"></div>
+    </form>`);
+}
+async function sendFeedback(form) {
+  const msg = $('fb-msg'), btn = $('fb-send');
+  const data = { person: form.dataset.person, about: $('fb-about').value, text: $('fb-text').value.trim(),
+    author: $('fb-author').value.trim(), email: $('fb-email').value.trim(), consent: $('fb-consent').checked };
+  const fail = t => { msg.className = 'fb-msg err'; msg.textContent = t; };
+  if (data.text.length < 10) return fail('Напишите текст сообщения (хотя бы 10 знаков).');
+  if (data.author.length < 2) return fail('Укажите ваше имя.');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(data.email)) return fail('Проверьте адрес электронной почты.');
+  if (!data.consent) return fail('Отметьте согласие на обработку имени и e-mail.');
+  btn.disabled = true; msg.className = 'fb-msg'; msg.textContent = 'Отправляю…';
+  try {
+    const r = await fetch('api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) return fail(j.error || `Не удалось отправить (ошибка ${r.status}). Попробуйте позже.`);
+    try { localStorage.setItem('fb-author', JSON.stringify({ author: data.author, email: data.email })); } catch (e) {}
+    $('fb-text').value = '';
+    const m = $('fb-msg'); m.className = 'fb-msg ok';
+    m.textContent = `Спасибо! Сообщение ${j.id} получено и ушло на проверку. Здесь оно появится после того, как исследователь его проверит и примет.`;
+    m.scrollIntoView({ block: 'nearest' });
+  } catch (e) { fail('Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.'); }
+  finally { const b = $('fb-send'); if (b) b.disabled = false; }
+}
+function showEdge(e) {
+  S.tab = 'person'; S.sel = null;
+  $('t-search').classList.remove('on'); $('t-person').classList.add('on');
+  const arts = (e.arts || []).map(artLine).join('');
+  $('pbody').innerHTML = `<h2>${e.lv === 'rejected' ? 'Отброшенная связь' : 'Гипотеза'}: ${T_NAME[e.t]}</h2>
+    <div class="fact">${plink(e.a)} — ${plink(e.b)}</div>
+    ${cellHTML('e:' + e.id + ':' + e.a + ':' + e.b, `${T_NAME[e.t]}: ${pname(e.a)} — ${pname(e.b)}`, e.docs, e.arts, `<span class="lv lv-${e.lv}">${LV_NAME[e.lv]}</span>${esc(e.why || '')}`)}
+    ${e.need ? `<div class="fact"><span class="need">${esc(e.need)}</span></div>` : ''}${e.reason ? `<div class="fact"><span class="reason">${esc(e.reason)}</span></div>` : ''}
+    ${arts ? `<h3>Источники (шифры)</h3>${arts}` : ''}`;
+  if (innerWidth <= 760) setMin(false);
+}
+// внешние ссылки: одна — сразу в новой вкладке; несколько — короткий список
+function openExt(key, btn) {
+  const ref = DOCREF.get(key); if (!ref) return;
+  document.querySelectorAll('.menu').forEach(m => m.remove());
+  if (ref.urls.length === 1) { window.open(ref.urls[0][1], '_blank', 'noopener'); return; }
+  const m = document.createElement('div'); m.className = 'menu';
+  m.innerHTML = ref.urls.map(([a, u]) => { let host = u; try { host = new URL(u).hostname; } catch (e) {}
+    return `<a href="${esc(u)}" target="_blank" rel="noopener">${esc((D.arts[a]?.title || a).slice(0, 80))}<small>${esc(host)}</small></a>`; }).join('');
+  btn.parentElement.appendChild(m);
+}
+// галерея документов
+let G = [], gi = 0, gview = { x: 0, y: 0, k: 1 };
+function placeViewer() {
+  const narrow = innerWidth <= 760, pr = $('panel').getBoundingClientRect();
+  document.documentElement.style.setProperty('--vr', narrow ? '0px' : pr.width + 'px');
+  document.documentElement.style.setProperty('--vb', narrow ? (innerHeight - pr.top) + 'px' : '0px');
+}
+function openDocs(key) {
+  const ref = DOCREF.get(key); if (!ref) return;
+  G = ref.docs.flatMap(d => d.f.map(f => ({ f, a: d.a, k: (D.arts[d.a]?.files.find(x => x.n === f) || {}).k || 'file' })));
+  if (!G.length) return;
+  $('vt').textContent = ref.title.length > 170 ? ref.title.slice(0, 170) + '…' : ref.title;
+  $('vthumbs').innerHTML = ref.docs.map(d => { const a = D.arts[d.a] || {};
+    return `<div class="tg"><div class="lab" title="${esc(a.title || d.a)}">${esc([a.repo, a.ref].filter(Boolean).join(', ') || a.title || d.a)}</div><div class="row">${
+      d.f.map(f => { const k = G.findIndex(g => g.f === f && g.a === d.a), g = G[k];
+        return g.k === 'img' ? `<button class="th" data-k="${k}" style="background-image:url('docs/${encodeURIComponent(d.a)}/${encodeURIComponent(f)}')" aria-label="Страница ${k + 1}"></button>`
+          : `<button class="th" data-k="${k}" aria-label="Документ ${k + 1}">${esc((f.split('.').pop() || '').toUpperCase())}</button>`; }).join('')}</div></div>`; }).join('');
+  placeViewer(); $('viewer').hidden = false; showDoc(0);
+}
+function showDoc(k) {
+  gi = (k + G.length) % G.length;
+  const g = G[gi], a = D.arts[g.a] || {}, url = `docs/${encodeURIComponent(g.a)}/${encodeURIComponent(g.f)}`, st = $('stage');
+  st.querySelectorAll('iframe, pre, .other').forEach(x => x.remove());
+  const img = $('vimg');
+  img.hidden = g.k !== 'img'; $('vfit').hidden = g.k !== 'img';
+  if (g.k === 'img') { img.onload = fitDoc; img.src = url; }
+  else if (g.k === 'pdf') st.insertAdjacentHTML('beforeend', `<iframe src="${url}" title="${esc(g.f)}"></iframe>`);
+  else if (g.k === 'html') st.insertAdjacentHTML('beforeend', `<iframe sandbox src="${url}" title="${esc(g.f)}"></iframe>`);
+  else if (g.k === 'txt') { const pre = document.createElement('pre'); pre.textContent = 'Загрузка…'; st.appendChild(pre);
+    fetch(url).then(r => r.text()).then(t => { pre.textContent = t; }).catch(() => { pre.textContent = 'Не удалось загрузить файл.'; }); }
+  else st.insertAdjacentHTML('beforeend', `<div class="other">Файл ${esc(g.f)}<a href="${url}" download>Скачать</a></div>`);
+  document.querySelectorAll('.th').forEach(t => t.classList.toggle('on', +t.dataset.k === gi));
+  $('vcap').innerHTML = `<b>${esc(a.title || g.a)}</b><br><span class="c">${esc([a.repo, a.ref].filter(Boolean).join(', '))}${a.date ? ' · ' + esc(a.date) : ''} · страница ${gi + 1} из ${G.length}${g.k === 'pdf' ? ` · <a href="${url}" target="_blank" rel="noopener">открыть PDF в новой вкладке</a>` : ''}</span>` +
+    (a.where ? `<br><span class="c">Где именно: ${esc(a.where.length > 400 ? a.where.slice(0, 400) + '…' : a.where)}</span>` : '') +
+    (a.urls && a.urls[0] ? `<br><a href="${esc(a.urls[0])}" target="_blank" rel="noopener">Открыть на сайте источника ↗</a>` : '');
+  $('vprev').hidden = $('vnext').hidden = G.length < 2;
+}
+function applyDoc() { $('vimg').style.transform = `translate(${gview.x}px,${gview.y}px) scale(${gview.k})`; }
+function fitDoc() {
+  const s = $('stage').getBoundingClientRect(), img = $('vimg');
+  if (!img.naturalWidth) return;
+  const k = Math.min((s.width - 100) / img.naturalWidth, (s.height - 20) / img.naturalHeight, 2);
+  gview = { k, x: (s.width - img.naturalWidth * k) / 2, y: (s.height - img.naturalHeight * k) / 2 }; applyDoc();
+}
+function bindViewer() {
+  $('vclose').onclick = () => { $('viewer').hidden = true; $('stage').querySelectorAll('iframe').forEach(x => x.remove()); };
+  $('vfit').onclick = fitDoc;
+  $('vprev').onclick = () => showDoc(gi - 1); $('vnext').onclick = () => showDoc(gi + 1);
+  $('vthumbs').addEventListener('click', ev => { const t = ev.target.closest('[data-k]'); if (t) showDoc(+t.dataset.k); });
+  document.addEventListener('keydown', ev => {
+    if ($('viewer').hidden) return;
+    if (ev.key === 'Escape') $('vclose').click(); else if (ev.key === 'ArrowLeft') showDoc(gi - 1); else if (ev.key === 'ArrowRight') showDoc(gi + 1);
+  });
+  document.addEventListener('click', ev => { if (!ev.target.closest('[data-ext]') && !ev.target.closest('.menu')) document.querySelectorAll('.menu').forEach(m => m.remove()); });
+  const st = $('stage'), pts = new Map(); let start = null, pinch = null;
+  st.addEventListener('wheel', ev => { if ($('vimg').hidden) return; ev.preventDefault(); const r = st.getBoundingClientRect(), cx = ev.clientX - r.left, cy = ev.clientY - r.top;
+    const k = Math.min(8, Math.max(.05, gview.k * Math.exp(-ev.deltaY * .0015))); gview.x = cx - (cx - gview.x) * k / gview.k; gview.y = cy - (cy - gview.y) * k / gview.k; gview.k = k; applyDoc(); }, { passive: false });
+  st.addEventListener('pointerdown', ev => { if (ev.target.closest('button') || $('vimg').hidden) return; st.setPointerCapture(ev.pointerId); pts.set(ev.pointerId, [ev.clientX, ev.clientY]);
+    start = { x: ev.clientX, y: ev.clientY, vx: gview.x, vy: gview.y };
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), k: gview.k, vx: gview.x, vy: gview.y, mx: (a[0] + b[0]) / 2, my: (a[1] + b[1]) / 2 }; } });
+  st.addEventListener('pointermove', ev => { if (!pts.has(ev.pointerId)) return; pts.set(ev.pointerId, [ev.clientX, ev.clientY]);
+    if (pinch && pts.size === 2) { const [a, b] = [...pts.values()], r = st.getBoundingClientRect(), k = Math.min(8, Math.max(.05, pinch.k * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d));
+      const mx = pinch.mx - r.left, my = pinch.my - r.top; gview.x = mx - (mx - pinch.vx) * k / pinch.k; gview.y = my - (my - pinch.vy) * k / pinch.k; gview.k = k; applyDoc(); return; }
+    gview.x = start.vx + ev.clientX - start.x; gview.y = start.vy + ev.clientY - start.y; applyDoc(); });
+  const up = ev => { pts.delete(ev.pointerId); if (pts.size < 2) pinch = null; };
+  st.addEventListener('pointerup', up); st.addEventListener('pointercancel', up);
+  addEventListener('resize', () => { if (!$('viewer').hidden) { placeViewer(); fitDoc(); } });
+}
+function setMin(m) { $('panel').classList.toggle('min', m); document.body.classList.toggle('pmin', m); $('hide').textContent = m ? (innerWidth <= 760 ? '⌃' : '‹') : (innerWidth <= 760 ? '⌄' : '›');
+  if (innerWidth > 760) $('panel').style.width = m ? '42px' : ''; $('tabs').querySelectorAll('[role=tab]').forEach(t => t.hidden = m && innerWidth > 760); }
+
+/* ---------- ввод ---------- */
+function bindUI() {
+  const vp = $('vp'), pts = new Map();
+  let start = null, moved = false, pinch = null;
+  vp.addEventListener('pointerdown', ev => {
+    if (ev.target.closest('button')) return;
+    vp.setPointerCapture(ev.pointerId); pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    moved = false; start = { x: ev.clientX, y: ev.clientY, vx: S.view.x, vy: S.view.y };
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), k: S.view.k, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, vx: S.view.x, vy: S.view.y }; }
+  });
+  vp.addEventListener('pointermove', ev => {
+    if (!pts.has(ev.pointerId)) return;
+    pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pts.size >= 2 && pinch) {
+      const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const k = Math.min(2.5, Math.max(0.12, pinch.k * d / pinch.d));
+      S.view.x = mx - (pinch.mx - pinch.vx) * (k / pinch.k); S.view.y = my - (pinch.my - pinch.vy) * (k / pinch.k); S.view.k = k;
+      moved = true; applyView(); return;
+    }
+    const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) { moved = true; vp.classList.add('drag'); }
+    if (moved) { S.view.x = start.vx + dx; S.view.y = start.vy + dy; applyView(); }
+  });
+  const up = ev => {
+    if (!pts.has(ev.pointerId)) return;
+    pts.delete(ev.pointerId); vp.classList.remove('drag');
+    if (pts.size < 2) pinch = null;
+    if (pts.size === 1) { const [r] = pts.values(); start = { x: r.x, y: r.y, vx: S.view.x, vy: S.view.y }; return; }
+    if (!moved && ev.type === 'pointerup') {
+      const card = document.elementsFromPoint(ev.clientX, ev.clientY).find(el => el.classList?.contains('card'));
+      if (card) select(card.dataset.id);
+    }
+  };
+  vp.addEventListener('pointerup', up); vp.addEventListener('pointercancel', up);
+  $('world').addEventListener('pointerover', ev => { const c = ev.target.closest('.card'); const id = c ? c.dataset.id : null; if (id !== hoverId && ev.pointerType === 'mouse') { hoverId = id; highlight(); } });
+  $('world').addEventListener('pointerleave', () => { if (hoverId) { hoverId = null; highlight(); } });
+  vp.addEventListener('wheel', ev => { ev.preventDefault(); zoomAt(Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.0015)), ev.clientX, ev.clientY); }, { passive: false });
+  $('world').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-ex]'); if (!b) return;
+    ev.stopPropagation(); const id = b.dataset.ex;
+    S.expanded.has(id) ? S.expanded.delete(id) : S.expanded.add(id);
+    relayout(id);
+  });
+  $('zin').onclick = () => { const a = area(); zoomAt(1.25, a.w / 2, a.h / 2); };
+  $('zout').onclick = () => { const a = area(); zoomAt(0.8, a.w / 2, a.h / 2); };
+  // режим «По семьям»: цвет карточки — по фамилии семьи; фильтр — одна семья цветная, остальные серые
+  $('famtog').onclick = () => setFamMode(!S.famMode);
+  $('fams').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-fam]'); if (!b) return;
+    const prev = S.famFilter; applyFamFilter(S.famFilter === b.dataset.fam ? null : b.dataset.fam); renderFams(); relayout(famAnchor(S.famFilter || prev));
+  });
+  try { if (localStorage.getItem('fam-mode') === '1') setFamMode(true, false); } catch (e) {}
+  $('t-search').onclick = () => { S.tab = 'search'; setMin(false); renderPanel(); };
+  $('t-person').onclick = () => { S.tab = 'person'; setMin(false); renderPanel(); };
+  $('hide').onclick = () => setMin(!$('panel').classList.contains('min'));
+  $('pbody').addEventListener('click', ev => {
+    const d = ev.target.closest('[data-doc]'), x = ev.target.closest('[data-ext]');
+    if (d) { ev.stopPropagation(); openDocs(d.dataset.doc); return; }
+    if (x) { ev.stopPropagation(); openExt(x.dataset.ext, x); return; }
+    const g = ev.target.closest('[data-go]'); if (g && g.dataset.go) { focusPerson(g.dataset.go); }
+  });
+  $('pbody').addEventListener('keydown', ev => {
+    const g = ev.target.closest('[role=button][data-go]'); if (g && ev.key === 'Enter' && g.dataset.go) focusPerson(g.dataset.go);
+  });
+  bindViewer();
+  $('pbody').addEventListener('submit', ev => { if (ev.target.id === 'fb') { ev.preventDefault(); sendFeedback(ev.target); } });
+  $('pbody').addEventListener('change', ev => {
+    if (ev.target.id === 'c-rej') { S.showRej = ev.target.checked; renderPanel(); relayout(null, false); }
+  });
+  const q = $('q'), res = $('qres');
+  q.addEventListener('input', () => {
+    const t = norm(q.value.trim());
+    if (t.length < 2) { res.hidden = true; return; }
+    const words = t.split(/\s+/);
+    const hits = D.persons.filter(p => p.q && words.every(w => p.q.includes(w))).slice(0, 10);
+    const chits = D.claims.filter(c => c.q && words.every(w => c.q.includes(w)) && c.subj.some(x => P.has(x))).slice(0, 12);
+    const snip = txt => { const i = norm(txt).indexOf(words[0]); const a = Math.max(0, i - 40); return (a ? '…' : '') + txt.slice(a, a + 150) + (txt.length > a + 150 ? '…' : ''); };
+    res.innerHTML = (hits.length ? '<div class="grp">Люди</div>' + hits.map(p => `<button data-id="${p.id}">${esc(p.name)} <small>${esc(p.b?.t || '')} · ${esc(D.gens[p.gen]?.name || '')}</small></button>`).join('') : '') +
+      (chits.length ? '<div class="grp">Утверждения</div>' + chits.map(c => `<button data-claim="${c.id}"><span class="lv lv-${c.lv}">${LV_NAME[c.lv]}</span><small>${esc(pname(c.subj.find(x => P.has(x))))}</small><span class="snip">${esc(snip(c.text))}</span></button>`).join('') : '') ||
+      '<div style="padding:8px 10px" class="sub">Ничего не нашлось</div>';
+    res.hidden = false;
+  });
+  res.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-id]'), c = ev.target.closest('[data-claim]');
+    if (b) { res.hidden = true; q.value = ''; focusPerson(b.dataset.id); return; }
+    if (c) {  // утверждение: открыть карточку человека и прокрутить к этому утверждению
+      const cl = CL.get(c.dataset.claim); res.hidden = true; q.value = '';
+      focusPerson(cl.subj.find(x => P.has(x)));
+      const el = document.getElementById('cl-' + cl.id);
+      if (el) { el.closest('details')?.setAttribute('open', ''); el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2200); }
+    }
+  });
+  q.addEventListener('keydown', ev => { if (ev.key === 'Enter') res.querySelector('[data-id], [data-claim]')?.click(); if (ev.key === 'Escape') res.hidden = true; });
+  // легенда: по умолчанию открыта, выбор зрителя запоминается в браузере
+  const setLegend = open => { $('lg-body').hidden = !open; $('lgtog').textContent = open ? 'Скрыть' : 'Развернуть'; $('lgtog').setAttribute('aria-expanded', open); };
+  let lgOpen = true;
+  try { lgOpen = localStorage.getItem('lg-closed') !== '1'; } catch (e) {}
+  setLegend(lgOpen);
+  $('lgtog').onclick = () => { lgOpen = $('lg-body').hidden; setLegend(lgOpen); try { localStorage.setItem('lg-closed', lgOpen ? '0' : '1'); } catch (e) {} };
+  addEventListener('resize', drawGens);
+  if (innerWidth <= 760) setMin(true);
+}
 </script>
 </body>
 </html>

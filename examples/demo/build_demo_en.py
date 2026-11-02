@@ -38,12 +38,12 @@ def main() -> None:
 
     img = ("--kind", "document-image", "--originality", "image-of-original", "--directness", "direct",
            "--repository", "GAOO (fictional)", "--provenance", "Image from the archive's online reading room (fictional)")
-    src("birth-1885-no12.txt", "--title", "Holy Trinity register 1885, births No. 12", *img,
+    src("birth-1885-no12.txt", "--scan-publication", "allow", "--title", "Holy Trinity register 1885, births No. 12", *img,
         "--ref", "f. 15, op. 2, d. 41, l. 7v", "--date", "1885-03-03", "--group", "reg-1885-12")              # A-0001
     src("index-1885.txt", "--title", "Index 'Olkhov registers', record 55102", "--kind", "index-record",
         "--url", "https://example.org/olkhov-registers/55102", "--originality", "index", "--directness", "direct",
         "--group", "reg-1885-12", "--provenance", "Index of the same register entry — not independent")       # A-0002
-    src("marriage-1910-no4.txt", "--title", "Holy Trinity register 1910, marriages No. 4", *img,
+    src("marriage-1910-no4.txt", "--scan-publication", "allow", "--title", "Holy Trinity register 1910, marriages No. 4", *img,
         "--ref", "f. 15, op. 2, d. 66, l. 31", "--date", "1910-01-14", "--group", "reg-1910-m4")              # A-0003
     src("notice-1941.txt", "--title", "Death notice (family archive)", "--kind", "document-image", "--date", "1941",
         "--originality", "original", "--directness", "direct", "--group", "notice-1941",
@@ -51,13 +51,13 @@ def main() -> None:
     src("memorial-book-1942.txt", "--title", "Memorial Book of the Olkhov region, vol. 3, p. 212", "--kind", "book",
         "--date", "1995", "--originality", "derivative", "--directness", "direct", "--group", "mb-1942",
         "--provenance", "Published book; its primary loss report was not found")                          # A-0005
-    src("civil-1921-no58.txt", "--title", "Civil registry extract, birth 1921 No. 58", "--kind", "official-extract",
+    src("civil-1921-no58.txt", "--scan-publication", "allow", "--title", "Civil registry extract, birth 1921 No. 58", "--kind", "official-extract",
         "--originality", "official-extract", "--directness", "direct", "--repository", "GAOO (fictional)",
         "--ref", "f. R-210, op. 1, d. 12, l. 40", "--date", "1921-07-15", "--group", "civil-1921-58",
         "--provenance", "Archive extract on request (fictional)")                                          # A-0006
-    src("birth-1880-no31.txt", "--title", "Holy Trinity register 1880, births No. 31", *img,
+    src("birth-1880-no31.txt", "--scan-publication", "allow", "--title", "Holy Trinity register 1880, births No. 31", *img,
         "--ref", "f. 15, op. 2, d. 36, l. 12", "--date", "1880-05-10", "--group", "reg-1880-31")              # A-0007
-    src("draft-1903-no211.txt", "--title", "Zarechny district draft list 1903, No. 211", *img,
+    src("draft-1903-no211.txt", "--scan-publication", "allow", "--title", "Zarechny district draft list 1903, No. 211", *img,
         "--ref", "f. 98, op. 1, d. 402, l. 55", "--date", "1903", "--group", "draft-1903")                    # A-0008
     src("family-story.txt", "--title", "Family story about Fyodor Somov", "--kind", "family-oral",
         "--originality", "family-information", "--group", "family-oral-1", "--provenance", "From the researcher")  # A-0009

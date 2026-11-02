@@ -125,13 +125,15 @@ def build(case: Case, profile: str = "private") -> Path:
     out = case.root / "site" / profile
     if out.exists():  # удалить до сборки: при ошибке не должна остаться прежняя (возможно, устаревшая) версия
         shutil.rmtree(out)
-    _, data, hidden = publish.write(case, profile)
-    gen = generations(data)
-    data.pop("_by_id", None)
-    for p in data["persons"]:
-        p["gen"] = gen[p["id"]]
+    from . import tree_data  # локальный импорт: tree_data использует generations из этого модуля
+    _, pub, hidden = publish.write(case, profile)
+    data, manifest = tree_data.build(case, profile, pub)
     out.mkdir(parents=True)
-    (out / "tree.json").write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    (out / "tree.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+    for src, rel in manifest:  # файлы источников к фактам (в public — только scan_publication=allow)
+        dest = out / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dest)
     theme = case.root / THEME_DIR
     page = theme / "index.html" if (theme / "index.html").is_file() else WEB / "index.html"
     html = page.read_text(encoding="utf-8")
@@ -145,7 +147,12 @@ def build(case: Case, profile: str = "private") -> Path:
         (out / "robots.txt").write_text("User-agent: *\nDisallow: /\n", encoding="utf-8")
     # повторная проверка всей сборки (все маршруты = все файлы папки)
     terms = publish.forbidden_terms(case, {pid: "" for pid in hidden})
-    problems = publish.check_leaks(sorted(p for p in out.rglob("*") if p.is_file()), terms)
+    files = sorted(p for p in out.rglob("*") if p.is_file())
+    docs = [p for p in files if (out / "docs") in p.parents]
+    # данные и страница — полная проверка; файлы документов выкладываются только по явному решению автора
+    # (в public — scan_publication=allow), а в старых документах совпадения имён с живыми родственниками неизбежны:
+    # в них проверяются только e-mail, телефоны и локальные пути
+    problems = publish.check_leaks([p for p in files if p not in docs], terms) + publish.check_leaks(docs, [])
     if problems:
         shutil.rmtree(out)
         raise KinError("Сайт не собран — утечки в сборке:\n- " + "\n- ".join(problems))
