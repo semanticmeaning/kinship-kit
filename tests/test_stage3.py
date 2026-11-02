@@ -403,3 +403,42 @@ class TestPublicationChoices(Base):
         self.assertIn("+<title>Наш род</title>", self.kin("site", "theme", "diff").stdout)
         self.kin("site", "build")
         self.assertIn("Наш род", (out / "index.html").read_text(encoding="utf-8"))
+
+
+class TestUpgrade(unittest.TestCase):
+    def test_versions_consistent_and_changelog(self):
+        from kin import __version__, updates
+        skill = (REPO / "skills" / "kinship-kit" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn(f'version: "{__version__}"', skill)
+        log = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn(f"## [{__version__}]", log)
+        self.assertEqual(updates.changes_since(log, __version__), "")
+        self.assertIn(f"[{__version__}]", updates.changes_since(log, "0.0.1"))
+        self.assertGreater(updates.parse_version("v0.10.0"), updates.parse_version("0.9.9"))
+
+    def test_check_with_fake_github_and_status_notice(self):
+        from kin import updates
+        with tempfile.TemporaryDirectory() as tmp:
+            old_cache, old_get = updates.CACHE, updates._get
+            updates.CACHE = Path(tmp) / "u.json"
+
+            def fake(url):
+                if "tags" in url:
+                    return json.dumps([{"name": "v9.0.0"}, {"name": "v0.1.0"}, {"name": "latest"}]).encode()
+                return b"## [9.0.0] - x\n- big change\n## [0.1.0] - y\n- old\n"
+            updates._get = fake
+            try:
+                r = updates.check()
+                self.assertTrue(r["newer"])
+                self.assertEqual(r["latest"], "9.0.0")
+                self.assertIn("big change", r["changes"])
+                self.assertNotIn("old", r["changes"])
+                self.assertIn("9.0.0", updates.notice())
+
+                def offline(url):
+                    raise OSError("нет сети")
+                updates._get = offline
+                with self.assertRaises(KinError):
+                    updates.check()
+            finally:
+                updates.CACHE, updates._get = old_cache, old_get

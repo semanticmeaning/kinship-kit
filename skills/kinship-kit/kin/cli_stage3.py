@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 
-from . import exchange, feedback, gedcom, index, mcp_server
+from . import exchange, feedback, gedcom, index, mcp_server, updates
 from .store import Case, KinError, find_case_dir
 
 
@@ -134,7 +134,29 @@ def cmd_feedback(args) -> int:
     raise KinError(args.action)
 
 
+def cmd_update(args) -> int:
+    if args.action == "check":
+        r = updates.check()
+        if r["newer"]:
+            text = (f"Вышла новая версия kinship-kit {r['latest']} (установлена {r['current']}).\n"
+                    + (f"\n{r['changes']}\n" if r["changes"] else "")
+                    + "\nОбновить: kin upgrade apply (данные дел не затрагиваются; затем в деле — kin migrate --dry-run)")
+        else:
+            text = f"Установлена последняя версия kinship-kit {r['current']}."
+        _out(args, r, text)
+        return 0
+    print(updates.apply())
+    return 0
+
+
 def add_commands(sub, common) -> None:
+    g = sub.add_parser("upgrade", help="Проверить новую версию набора на GitHub / обновить клон").add_subparsers(dest="sub", required=True)
+    p = g.add_parser("check", help="Есть ли новая версия и что в ней изменилось")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_update, action="check")
+    p = g.add_parser("apply", help="git pull --ff-only в клоне набора (только с согласия пользователя)")
+    p.set_defaults(fn=cmd_update, action="apply")
+
     p = sub.add_parser("export", help="Полный экспорт дела (собственный формат JSON, docs/EXPORT.md)")
     p.add_argument("--out", required=True)
     p.add_argument("--with-files", action="store_true", help="Включить файлы источников (base64)")

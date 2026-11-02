@@ -12,6 +12,11 @@ Task → Implementation → Automated Tests → Independent Review → Correctio
 Тривиальные безопасные правки — без отдельного ревью. Изменения **модели данных, логики доказательности,
 экспорта и приватности** — обязательно с независимым ревью (роль Code Reviewer / Security & Privacy Reviewer).
 
+## Версии
+`kin/__init__.py` (`__version__`) и `SKILL.md` (`metadata.version`) — одна версия (проверяется тестом). Выпуск:
+запись в `CHANGELOG.md` (с пометкой, нужна ли `kin migrate`), коммит, метка `git tag vX.Y.Z`, `git push --tags`.
+`kin upgrade check` у пользователей смотрит именно метки.
+
 ## Definition of Done
 Функциональность реализована; тесты добавлены и проходят (`tools/check.sh`); документация обновлена
 (`docs/ARCHITECTURE.md`, `SKILL.md`, `docs/ACCEPTANCE.md`); старые сценарии не сломаны (демо-дело строится);

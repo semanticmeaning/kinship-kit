@@ -9,7 +9,7 @@ import json
 
 import datetime as dt
 
-from . import audit, feedback, workflow
+from . import audit, feedback, updates, workflow
 from .i18n import t
 from .store import Case, split_ids
 
@@ -79,6 +79,7 @@ def collect(case: Case) -> dict:
                            "overdue": bool(r["status"] == "sent" and r.get("due_date") and r["due_date"] < today)}
                           for r in requests],
         "family_reports_pending": len(feedback.pending(case)),
+        "update_notice": updates.notice(),
         "next": nxt,
     }
 
@@ -87,6 +88,8 @@ def format_text(s: dict) -> str:
     out = [f"{t('Дело')}: {s['case']}  ({s['path']})",
            f"{t('Записей')}: " + ", ".join(f"{k}={v}" for k, v in s["counts"].items() if v),
            f"{t('Аудит: ошибок')} {s['audit']['errors']}, {t('предупреждений')} {s['audit']['warnings']}"]
+    if s.get("update_notice"):
+        out.append(f"ℹ {s['update_notice']}")
     if s["next"]:
         out.append(f"\n▶ {t('СЛЕДУЮЩИЙ ШАГ')}: {s['next']['text']}")
     out.append(f"\n{t('Активные гипотезы')} ({len(s['active_hypotheses'])}):")

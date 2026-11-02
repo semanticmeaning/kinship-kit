@@ -50,6 +50,16 @@ kin audit && kin site serve                 # схема рода: http://127.0.
 python3 examples/demo/build_demo.py ~/kinship-cases/demo && kin --case ~/kinship-cases/demo next
 ```
 
+## Обновление
+
+```bash
+kin upgrade check      # есть ли новая версия и что изменилось (CHANGELOG.md)
+kin upgrade apply      # git pull в клоне набора; данные дел не затрагиваются
+kin migrate --dry-run  # в каждом деле: нужна ли миграция схемы (резервная копия создаётся сама)
+```
+Если ставили копией (без `--link`), после обновления повторите `sh install.sh`. Свои правки набора — в форке или
+в теме дела (`kin site theme`), чтобы обновления не давали конфликтов. Агент сам предложит обновиться раз в сеанс.
+
 ## Что внутри
 
 | Часть | Где |
