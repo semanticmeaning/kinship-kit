@@ -141,6 +141,12 @@ def build(case: Case, profile: str = "private") -> Path:
         shutil.copy(theme / "custom.css", out / "custom.css")
         html = html.replace("</head>", '<link rel="stylesheet" href="custom.css">\n</head>', 1)
     (out / "index.html").write_text(html, encoding="utf-8")
+    for icons in (WEB / "icons", theme / "icons"):  # иконки страницы (пол на карточках); своя тема может их заменить
+        if icons.is_dir():
+            (out / "icons").mkdir(exist_ok=True)
+            for f in icons.iterdir():
+                if f.is_file() and f.suffix.lower() in (".png", ".webp", ".jpg", ".gif"):
+                    shutil.copyfile(f, out / "icons" / f.name)
     if profile == "public":
         (out / "robots.txt").write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
     else:

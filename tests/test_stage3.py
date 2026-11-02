@@ -498,3 +498,18 @@ class TestActiveDocs(Base):
         self.assertEqual(docs, ["archive-page.html.txt"])
         tree = json.loads((self.case / "site" / "private" / "tree.json").read_text(encoding="utf-8"))
         self.assertEqual(tree["arts"][aid]["files"], [{"n": "archive-page.html.txt", "k": "txt"}])
+
+
+class TestSiteAssets(Base):
+    def test_page_assets_are_built(self):
+        """Всё, на что ссылается страница (иконки и т. п.), должно оказаться в сборке."""
+        import re
+        self.person("Ветлугин Сергей")
+        self.kin("site", "build")
+        out = self.case / "site" / "private"
+        html = (out / "index.html").read_text(encoding="utf-8")
+        refs = set(re.findall(r"""(?:src|href)=["']([^"':#?]+\.(?:png|svg|webp|jpg|gif|css|js))["']""", html))
+        refs |= set(re.findall(r"""url\(["']?([^"')#?:]+\.(?:png|svg|webp|jpg|gif))""", html))
+        self.assertTrue(refs, "страница должна ссылаться на иконки")
+        missing = [r for r in refs if not (out / r).is_file() and r != "custom.css"]
+        self.assertEqual(missing, [])
