@@ -17,3 +17,13 @@ jobs:
       - run: pip install ruff==0.17.3   # версия закреплена: новые правила не ломают сборку внезапно
       - run: sh tools/check.sh   # только синтетические данные; реальные дела в CI не передаются
       - run: pip install -e . && kin schema persons >/dev/null   # pyproject.toml: команда kin ставится и работает
+  windows:
+    # пока для диагностики: показывает, что ломается в Windows, но не блокирует слияние
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s tests -v
