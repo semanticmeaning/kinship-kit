@@ -40,6 +40,8 @@ class TestBuild(unittest.TestCase):
             snippet, guide = downloaders.build(aid)
             self.assertIn("function kinDownloader", snippet)
             self.assertIn("allow pasting", guide)
+            self.assertIn("от вашего имени", guide)  # предупреждение о вставке кода в консоль
+            self.assertIn("правилам сайта", guide)
             if NODE:
                 with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
                     f.write(snippet)
