@@ -88,7 +88,7 @@ class TestCoreInBrowser(Base):
             out = Path(self.tmp.name) / "download"
             res = subprocess.run([NODE, str(REPO / "tests" / "browser" / "run_downloader.mjs"), CHROME,
                                   f"http://127.0.0.1:{srv.server_address[1]}/unit", str(sp), str(out), str(cdp)],
-                                 capture_output=True, text=True, timeout=120)
+                                 capture_output=True, text=True, timeout=300)
             self.assertEqual(res.returncode, 0, res.stderr)
             result = json.loads(res.stdout.strip().splitlines()[-1])
         finally:

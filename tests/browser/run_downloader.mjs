@@ -10,7 +10,8 @@ const proc = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', `
   `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let targets;
-for (let i = 0; i < 50; i++) { try { targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json(); if (targets.length) break; } catch {} await sleep(200); }
+for (let i = 0; i < 300; i++) { try { targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json(); if (targets.some(t => t.type === 'page')) break; } catch {} await sleep(200); }  // холодный запуск Chrome в CI бывает долгим
+if (!targets || !targets.some(t => t.type === 'page')) { console.error('Chrome не запустился за 60 с'); proc.kill(); process.exit(3); }
 const page = targets.find(t => t.type === 'page');
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 await new Promise(r => ws.addEventListener('open', r));
@@ -27,13 +28,14 @@ window.showDirectoryPicker = async () => ({ async getFileHandle(name, o) {
 } });`;
 const snippet = readFileSync(snippetPath, 'utf8');
 await send('Page.enable'); await send('Runtime.enable');
-await send('Page.navigate', { url }); await sleep(1500);
+await send('Page.navigate', { url });
+for (let i = 0; i < 100; i++) { await sleep(200); if (await evaluate(`!!document.getElementById('scans')`)) break; }
 const results = [];
 for (let run = 1; run <= 2; run++) {
   await evaluate(FAKE_FS); await evaluate(snippet);
   await evaluate(`document.querySelector('#kinship-download-panel [data-a="start"]').click(); true`);
   let status = '';
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < 600; i++) {
     await sleep(200);
     status = await evaluate(`(() => { const p = document.getElementById('kinship-download-panel'); return p.dataset.running === 'false' ? p.querySelector('[data-s]').textContent : ''; })()`);
     if (status) break;

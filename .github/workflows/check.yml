@@ -1,5 +1,8 @@
 name: check
-on: [push, pull_request]
+on:
+  push:
+    branches: ['**']   # метки версий (v*) не запускают проверку повторно
+  pull_request:
 jobs:
   check:
     runs-on: ubuntu-latest
