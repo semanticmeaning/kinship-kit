@@ -455,7 +455,7 @@ function layout(vis) {
   const lineHint = new Map();
   for (const l of D.lines) for (const f of l.focus) if (hint.has(f)) lineHint.set(l.id, hint.get(f));
   let changed = true, guard = 0;
-  while (changed && guard++ < 50) {
+  while (changed && guard++ < ids.length + 50) {  // одиночки получают место по одному за проход — проходов не меньше числа людей
     changed = false;
     for (const id of ids) {
       if (hint.has(id)) continue;
@@ -476,6 +476,7 @@ function layout(vis) {
       }
     }
   }
+  for (const id of ids) if (!Number.isFinite(hint.get(id))) hint.set(id, 0);  // страховка: без подсказки — в середину, а не NaN на всю схему
   const rows = new Map();
   for (const u of units) { if (!rows.has(u.gen)) rows.set(u.gen, []); rows.get(u.gen).push(u); }
   const directPerRow = new Map();

@@ -552,3 +552,36 @@ class TestSiteLanguages(Base):
             russian = sorted({x.strip() for x in re.findall(r"[А-Яа-яЁё][А-Яа-яЁё ]*", text)} - {"Русская версия"})
             self.assertEqual(russian, [])
             unlock(case)
+
+
+class TestLayoutCheck(Base):
+    def test_many_unlinked_people_still_laid_out(self):
+        """70 человек без связей: раньше раскладка оставляла пустые координаты и схема была пустой."""
+        import shutil as sh
+        if not sh.which("node"):
+            self.skipTest("нужен node")
+        for i in range(70):
+            self.kin("person", "add", "--label", f"Одиночкин Кандидат{i}", "--living", "deceased", "--status", "candidate",
+                     "--birth", str(1850 + i))
+        root = self.person("Корнев Корень", "deceased", "identity-confirmed", "--birth", "1950")
+        self.kin("case", "set", f"root_person={root}")
+        res = self.kin("site", "build")
+        self.assertNotIn("предупреждение", res.stderr)
+        sys.path.insert(0, str(REPO / "skills" / "kinship-kit"))
+        from kin import site as site_mod
+        out = self.case / "site" / "private"
+        self.assertEqual(site_mod.check_layout(out), [])
+        # и английская версия страницы тоже
+        res = subprocess.run(["node", str(REPO / "skills/kinship-kit/kin/web/check_layout.js"), str(out / "index.en.html"),
+                              str(out / "tree.json")], capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, res.stdout)
+
+    def test_demo_layout(self):
+        import shutil as sh
+        if not sh.which("node"):
+            self.skipTest("нужен node")
+        with tempfile.TemporaryDirectory() as tmp:
+            case = demo(tmp)
+            res = run("site", "build", case=case)
+            self.assertNotIn("предупреждение", res.stderr)
+            unlock(case)

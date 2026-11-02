@@ -9,6 +9,7 @@ import functools
 import http.server
 import json
 import shutil
+import sys
 from collections import deque
 from pathlib import Path
 
@@ -177,7 +178,25 @@ def build(case: Case, profile: str = "private") -> Path:
     if problems:
         shutil.rmtree(out)
         raise KinError("Сайт не собран — утечки в сборке:\n- " + "\n- ".join(problems))
+    for line in check_layout(out):  # раскладка на этих данных: пустые координаты, наложения, ошибки скрипта
+        print(line, file=sys.stderr)
     return out
+
+
+def check_layout(out: Path) -> list[str]:
+    """Прогнать код страницы на собранных данных (node): обычный вид, фильтры семей, раскрытия родни.
+    Возвращает строки «предупреждение: …»; пустой список — всё в порядке или node нет (тогда — одна строка-пояснение)."""
+    import shutil as _sh
+    import subprocess
+    node = _sh.which("node")
+    if not node:
+        return ["примечание: node не найден — раскладка сайта не проверена (kin работает и без него)"]
+    try:
+        res = subprocess.run([node, str(WEB / "check_layout.js"), str(out / "index.html"), str(out / "tree.json")],
+                             capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return [f"предупреждение: проверка раскладки не выполнилась — {e}"]
+    return [] if res.returncode == 0 else [l for l in res.stdout.splitlines() if l.strip()]
 
 
 class _Quiet(http.server.SimpleHTTPRequestHandler):
