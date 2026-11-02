@@ -25,9 +25,8 @@ def esc(s: str) -> str:
     return s.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
 
 
-for title, msg in items[:9]:
-    print(f"::error title={esc(title)}::{esc(msg[:3000])}")
-if len(items) > 9:
-    print("::error title=ещё упавшие тесты::" + esc("\n".join(t for t, _ in items[9:])[:3000]))
 summary = [ln for ln in text.splitlines() if ln.startswith(("Ran ", "OK", "FAILED"))]
-print("::error title=итог::" + esc("\n".join(summary) or "нет итога unittest"))
+# GitHub показывает не больше 10 аннотаций на шаг: первая — итог и полный список, дальше — подробности
+print("::error title=итог::" + esc("\n".join(summary + [t for t, _ in items]) or "нет итога unittest"))
+for title, msg in items[:8]:
+    print(f"::error title={esc(title)}::{esc(msg[:3000])}")

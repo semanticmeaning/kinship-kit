@@ -59,8 +59,10 @@ class Base(unittest.TestCase):
 
 def demo(tmp: str, name: str = "demo") -> Path:
     case = Path(tmp) / name
-    subprocess.run([sys.executable, str(REPO / "examples" / "demo" / "build_demo.py"), str(case)], check=True,
-                   capture_output=True)
+    res = subprocess.run([sys.executable, str(REPO / "examples" / "demo" / "build_demo.py"), str(case)],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if res.returncode != 0:
+        raise AssertionError(f"демо-дело не построено ({res.returncode}):\n{res.stdout[-1500:]}\n{res.stderr[-1500:]}")
     return case
 
 
