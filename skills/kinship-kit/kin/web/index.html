@@ -410,7 +410,7 @@ function famAnchor(f) {
 }
 function renderFams() {
   $('fams').hidden = !S.famMode;
-  $('fams').innerHTML = (D.families || []).map(f => `<button class="famchip${S.famFilter === f.key ? ' on' : S.famFilter ? ' off' : ''}" data-fam="${esc(f.key)}" style="--fc:${f.color}" title="${S.famFilter === f.key ? 'Показать все семьи' : 'Оставить цветной только эту семью'}"><i></i>${esc(f.name)} <small>${f.count}</small></button>`).join('');
+  $('fams').innerHTML = (D.families || []).map(f => `<button class="famchip${S.famFilter === f.key ? ' on' : S.famFilter ? ' off' : ''}" data-fam="${esc(f.key)}" style="--fc:${esc(f.color)}" title="${S.famFilter === f.key ? 'Показать все семьи' : 'Оставить цветной только эту семью'}"><i></i>${esc(f.name)} <small>${f.count}</small></button>`).join('');
 }
 function refreshCards() { buildCards(); place(1, S.pos); }
 function hiddenCount(id, vis) {
@@ -951,7 +951,7 @@ function searchHTML() {
   const out = [];
   for (const l of D.lines) {
     const hs = open.filter(c => c.line === l.id);
-    out.push(`<section class="line" style="--lc:${l.color}"><h4>${esc(l.title)}</h4>
+    out.push(`<section class="line" style="--lc:${esc(l.color)}"><h4>${esc(l.title)}</h4>
       <span class="state${/ждём/.test(l.state) ? ' wait' : ''}">${esc(l.state)}</span>
       <div class="sub">${esc(l.where)}</div>
       <div style="margin:6px 0">${l.focus.map(plink).join(', ')}</div>

@@ -70,6 +70,14 @@ def _git_change(case: Case, public: bool) -> tuple[str, dict | None]:
     return f"kinship-kit {__version__}", change
 
 
+DEFAULT_LINE_COLOR = "#8a7f6d"
+
+
+def _color(value) -> str:
+    """Цвет линии — только #hex: case.json можно править вручную, а значение попадает в атрибут style страницы."""
+    return value if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{3,8}", value) else DEFAULT_LINE_COLOR
+
+
 def build(case: Case, profile: str, pub: dict) -> tuple[dict, list[tuple[Path, str]]]:
     """(tree.json, [(файл источника, путь в сайте)]). pub — результат publish.build (уже отфильтрован)."""
     public = profile == "public"
@@ -204,7 +212,7 @@ def build(case: Case, profile: str, pub: dict) -> tuple[dict, list[tuple[Path, s
         focus = [x for x in split_ids(ln.get("focus", "")) if x in visible] if isinstance(ln.get("focus", ""), str) else \
             [x for x in ln.get("focus", []) if x in visible]
         lines.append({"id": ln["id"], "title": ln.get("title", ln["id"]), "state": ln.get("state", ""),
-                      "where": "" if public else ln.get("where", ""), "color": ln.get("color", "#8a7f6d"),
+                      "where": "" if public else ln.get("where", ""), "color": _color(ln.get("color")),
                       "surname": ln.get("surname", ""), "focus": focus})
 
     def own_line(pid):

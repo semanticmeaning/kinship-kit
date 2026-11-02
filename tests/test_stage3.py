@@ -534,6 +534,20 @@ class TestActiveDocs(Base):
 
 
 class TestSiteAssets(Base):
+    def test_line_color_cannot_break_out_of_style(self):
+        """case.json правят и вручную: цвет линии попадает в атрибут style — только #hex."""
+        self.person("Ветлугин Сергей")
+        cfg_path = self.case / "case.json"
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        cfg["lines"] = [{"id": "a", "title": "A", "color": 'red" onmouseover="alert(1)'}, {"id": "b", "title": "B", "color": "#2f6b8a"}]
+        cfg_path.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+        self.kin("site", "build")
+        data = json.loads((self.case / "site" / "private" / "tree.json").read_text(encoding="utf-8"))
+        self.assertEqual([ln["color"] for ln in data["lines"]], ["#8a7f6d", "#2f6b8a"])
+        html = (self.case / "site" / "private" / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn("--lc:${l.color}", html)
+        self.assertNotIn("--fc:${f.color}", html)
+
     def test_page_assets_are_built(self):
         """Всё, на что ссылается страница (иконки и т. п.), должно оказаться в сборке."""
         import re
