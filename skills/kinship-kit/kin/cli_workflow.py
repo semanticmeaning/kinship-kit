@@ -1,4 +1,4 @@
-"""Команды этапа 2: setup, migrate, next, history, task, hypothesis, search, review, request, agents, site publish, hooks."""
+"""Команды процесса исследования: setup, migrate, next, history, task, hypothesis, search, review, request, agents, site publish, hooks."""
 from __future__ import annotations
 
 import argparse

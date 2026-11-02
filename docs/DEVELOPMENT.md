@@ -1,8 +1,10 @@
 # Разработка набора
 
+Где что лежит и куда смотреть при типовых правках — `docs/CODEMAP.md`.
+
 ## Проверки
 ```bash
-sh tools/check.sh                      # синтаксис, схема, ruff (если есть), тесты, приватность репозитория
+sh tools/check.sh                      # синтаксис, схема, ruff (в CI обязателен), тесты, приватность репозитория
 git config core.hooksPath .githooks    # pre-commit: tools/check_repo.py --staged
 ```
 Личный стоп-лист (фамилии своей семьи и т. п.) — только вне репозитория: `~/.config/kinship-kit/denylist.txt` или `KIN_DENYLIST`.
@@ -18,8 +20,9 @@ Task → Implementation → Automated Tests → Independent Review → Correctio
 тест `TestSiteLanguages` проверяет, что все фрагменты словаря есть в шаблоне и что в английской версии нет русского.
 
 ## Версии
-`kin/__init__.py` (`__version__`) и `SKILL.md` (`metadata.version`) — одна версия (проверяется тестом). Выпуск:
+`kin/__init__.py` (`__version__`), `SKILL.md` (`version`) и `pyproject.toml` — одна версия (проверяется тестом). Выпуск:
 запись в `CHANGELOG.md` (с пометкой, нужна ли `kin migrate`), коммит, метка `git tag vX.Y.Z`, `git push --tags`.
+Изменения — в ветке через свой PR: CI запускается на PR и на `main`.
 `kin upgrade check` у пользователей смотрит именно метки.
 
 ## Definition of Done

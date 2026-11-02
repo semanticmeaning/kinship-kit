@@ -10,6 +10,7 @@
 - Перед коммитом: `sh tools/check.sh` (тесты + `tools/check_repo.py`). Хук: `git config core.hooksPath .githooks`.
 - Изменения модели данных, доказательности, экспорта, приватности — с тестом и независимым ревью; схема меняется
   только вместе с `schema_version` и миграцией.
+- Карта кода (что где лежит, куда смотреть при типовых правках) — `docs/CODEMAP.md`.
 - Процесс и Definition of Done — `docs/DEVELOPMENT.md`; архитектура — `docs/ARCHITECTURE.md`.
 - Роли для разработки: `.claude/agents/`, `.codex/agents/` (генерируются: `bin/kin agents install --set dev --target .`;
   править исходники в `skills/kinship-kit/roles/`).
