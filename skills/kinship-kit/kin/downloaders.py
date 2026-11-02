@@ -126,7 +126,8 @@ def import_download(case: Case, folder: Path, actor: str = "user", task: str = "
                 case.get(task)
             for key, rec, f in plan:
                 aid = case.next_id("artifacts")
-                dest = case.root / "sources" / f"{aid}__{re.sub(r'[^\w.-]+', '_', f.name)[:120]}"
+                safe = re.sub(r"[^\w.-]+", "_", f.name)[:120]
+                dest = case.root / "sources" / f"{aid}__{safe}"
                 shutil.copy2(f, dest)
                 created.append(dest)
                 dest.chmod(0o444)
@@ -145,7 +146,8 @@ def import_download(case: Case, folder: Path, actor: str = "user", task: str = "
                 report["artifacts"].append(aid)
                 if rec.get("text"):  # расшифровка сайта — отдельный источник той же группы (не независима от скана)
                     tid = case.next_id("artifacts")
-                    tdest = case.root / "sources" / f"{tid}__{re.sub(r'[^\w.-]+', '_', f.stem)[:110]}_text.txt"
+                    stem = re.sub(r"[^\w.-]+", "_", f.stem)[:110]
+                    tdest = case.root / "sources" / f"{tid}__{stem}_text.txt"
                     tdest.write_text(rec["text"], encoding="utf-8")
                     created.append(tdest)
                     tdest.chmod(0o444)

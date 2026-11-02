@@ -442,3 +442,13 @@ class TestUpgrade(unittest.TestCase):
                     updates.check()
             finally:
                 updates.CACHE, updates._get = old_cache, old_get
+
+
+class TestPython310Compat(unittest.TestCase):
+    def test_no_backslash_in_fstring_expressions(self):
+        """Python 3.10–3.11: обратный слэш внутри {…} f-строки — синтаксическая ошибка (CI проверяет 3.10)."""
+        import re
+        rx = [re.compile(r'\bf"[^"]*\{[^}"]*\\'), re.compile(r"\bf'[^']*\{[^}']*\\")]
+        bad = [f"{path.relative_to(REPO)}:{i}" for path in [*(REPO / "skills").rglob("*.py"), *(REPO / "tools").rglob("*.py")]
+               for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1) if any(r.search(line) for r in rx)]
+        self.assertEqual(bad, [])
