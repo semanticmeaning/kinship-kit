@@ -4,7 +4,7 @@ description: Генеалогическое исследование (бывши
 license: MIT (основано на ex-ussr-kinship-research © 2026 Denis Shiryaev)
 compatibility: Python 3.10+ (только стандартная библиотека), shell. Claude Code, Codex и другие клиенты с поддержкой Agent Skills.
 metadata:
-  version: "0.4.4"
+  version: "0.5.0"
   language: "ru"
   reply_language: "user"
 ---
