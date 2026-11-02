@@ -220,7 +220,7 @@ class Case:
                 except FileNotFoundError:
                     continue
                 if time.monotonic() > deadline:
-                    raise KinError(f"Дело занято другой записью ({lock}). Если процесс завис — удалите файл.")
+                    raise KinError(f"Дело занято другой записью ({lock}). Если процесс завис — удалите файл.") from None
                 time.sleep(0.1)
         self._lock_depth = 1
         try:

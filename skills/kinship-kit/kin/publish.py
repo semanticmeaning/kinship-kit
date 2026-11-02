@@ -60,7 +60,7 @@ def person_visible(p: dict, profile: str, cutoff_years: int, this_year: int | No
     by = latest_birth_year(p.get("birth_estimate", ""))
     if by is not None and by < this_year - cutoff_years:
         return True, ""
-    return False, "статус жизни неизвестен и рождение не раньше чем {} лет назад".format(cutoff_years)
+    return False, f"статус жизни неизвестен и рождение не раньше чем {cutoff_years} лет назад"
 
 
 def build(case: Case, profile: str) -> dict:
@@ -151,7 +151,7 @@ def build(case: Case, profile: str) -> dict:
     return {
         "meta": {"title": case.config.get("title", ""), "profile": profile, "built_at": now_iso(),
                  "schema_version": SCHEMA_VERSION, "root": root, "root_gen_offset": root_offset, "language": case.config.get("language", "ru"),
-                 "lines": [{k: l.get(k, "") for k in PUBLIC_LINE_FIELDS} for l in case.config.get("lines", [])]
+                 "lines": [{k: ln.get(k, "") for k in PUBLIC_LINE_FIELDS} for ln in case.config.get("lines", [])]
                  if public else case.config.get("lines", []),
                  "hidden_persons": None if public else len(hidden),
                  "feedback": bool(not public and case.config.get("feedback", {}).get("enabled"))},
@@ -220,7 +220,7 @@ def forbidden_terms(case: Case, hidden: dict) -> list[str]:
         for name in [p["preferred_label"]] + split_list(p.get("name_variants")):
             words = [w for w in _fold(name).split() if len(w) > 1 and not w.isdigit()]
             stems = list(dict.fromkeys(_stem(w) for w in words))
-            gap = r"\w*(?:\s+\w+){0,%d}\s+" % NAME_WINDOW
+            gap = rf"\w*(?:\s+\w+){{0,{NAME_WINDOW}}}\s+"
             for i, a in enumerate(stems):
                 for b in stems[i + 1:]:
                     for x, y in ((a, b), (b, a)):

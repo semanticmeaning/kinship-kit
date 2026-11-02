@@ -76,6 +76,7 @@ class Server:
         """Команда определяется настоящим парсером kin (глобальные ключи перед командой не помогают обойти запрет)."""
         import contextlib
         import io
+
         from .cli import build_parser
         try:
             with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):

@@ -17,8 +17,7 @@ import tarfile
 from pathlib import Path
 
 from . import __version__
-from .store import (CASE_FILE, REGISTERS, REGISTRY_DIR, SCHEMA_VERSION, Case, KinError, field_names, now_iso,
-                    sha256_file)
+from .store import CASE_FILE, REGISTERS, REGISTRY_DIR, SCHEMA_VERSION, Case, KinError, field_names, now_iso, sha256_file
 
 FORMAT = "kinship-kit-export"
 FORMAT_VERSION = 1
@@ -148,7 +147,7 @@ def import_data(case: Case, data: dict, actor: str = "user", dry_run: bool = Fal
         existing_journal = set()
         jp = case.root / "journal.jsonl"
         if jp.is_file():
-            existing_journal = {_entry_key(json.loads(l)) for l in jp.read_text(encoding="utf-8").splitlines() if l.strip()}
+            existing_journal = {_entry_key(json.loads(line)) for line in jp.read_text(encoding="utf-8").splitlines() if line.strip()}
         bad = [e for e in data.get("journal", []) if not (isinstance(e, dict) and isinstance(e.get("op"), str)
                                                           and isinstance(e.get("id", ""), str) and isinstance(e.get("data", {}), dict))]
         if bad:

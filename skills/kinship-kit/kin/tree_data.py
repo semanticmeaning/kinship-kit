@@ -15,7 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from . import __version__, edtf, feedback, site
-from .store import Case, split_ids, split_list
+from .store import Case, split_ids
 
 FAMILY_KINDS = {"family-oral", "family-tree", "letter", "photo"}
 DOC_KINDS = {".jpg": "img", ".jpeg": "img", ".png": "img", ".webp": "img", ".gif": "img", ".pdf": "pdf",
@@ -93,7 +93,7 @@ def build(case: Case, profile: str, pub: dict) -> tuple[dict, list[tuple[Path, s
         if case.root / "sources" not in p.parents or not p.is_file():
             continue
         name = re.sub(r"^A-\d+__", "", p.name)
-        if p.suffix.lower() in ACTIVE or not p.suffix.lower() in DOC_KINDS:
+        if p.suffix.lower() in ACTIVE or p.suffix.lower() not in DOC_KINDS:
             name += ".txt"  # только как текст
         files_of[aid] = [name]
         manifest.append((p, f"docs/{aid}/{name}"))
@@ -286,8 +286,8 @@ def build(case: Case, profile: str, pub: dict) -> tuple[dict, list[tuple[Path, s
         for e in edges:
             if pid in (e["a"], e["b"]):
                 arts += [a for a in e["arts"] if a not in arts]
-        ok = lambda types: any(c["type"] in types and c["lv"] in ("doc1", "doc2") for c in pc)  # noqa: E731
-        conflict = lambda types: len({reg_claims.get(c["id"], {}).get("date") for c in pc  # noqa: E731
+        ok = lambda types, pc=pc: any(c["type"] in types and c["lv"] in ("doc1", "doc2") for c in pc)  # noqa: E731
+        conflict = lambda types, pc=pc: len({reg_claims.get(c["id"], {}).get("date") for c in pc  # noqa: E731
                                       if c["type"] in types and c["lv"] != "rejected" and reg_claims.get(c["id"], {}).get("date")}) > 1
         b = _date(p["birth"], ok({"birth", "baptism"}), conflict({"birth"}), lang)
         d = _date(p["death"], ok({"death", "burial"}), conflict({"death"}), lang)

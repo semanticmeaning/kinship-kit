@@ -124,7 +124,7 @@ def import_download(case: Case, folder: Path, actor: str = "user", task: str = "
         with case.transaction():
             if task:
                 case.get(task)
-            for key, rec, f in plan:
+            for _key, rec, f in plan:
                 aid = case.next_id("artifacts")
                 safe = re.sub(r"[^\w.-]+", "_", f.name)[:120]
                 dest = case.root / "sources" / f"{aid}__{safe}"

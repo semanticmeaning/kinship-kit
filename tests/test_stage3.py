@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_kin import KIN, REPO, Base, run  # noqa: E402
 
 sys.path.insert(0, str(REPO / "skills" / "kinship-kit"))
-from kin import exchange, feedback, gedcom, mcp_server  # noqa: E402
+from kin import feedback, gedcom, mcp_server  # noqa: E402
 from kin.store import Case, KinError  # noqa: E402
 
 
@@ -363,7 +363,7 @@ class TestGedcomAtomic(Base):
 class TestPublicationChoices(Base):
     def setUp(self):
         super().setUp()
-        a = self.add_source("svid", group="g1")
+        self.add_source("svid", group="g1")
         self.grand = self.person("Ветлугин Сергей Петрович", "deceased", "identity-confirmed", "--birth", "1921")
         self.user = self.person("Ветлугина Анна Сергеевна", "living", "identity-confirmed", "--birth", "1952")
         self.kin("claim", "add", "--type", "other", "--subject", self.grand, "--status", "hypothesis",

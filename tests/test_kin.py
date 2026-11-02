@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -353,6 +352,7 @@ class TestPrivacyEdgeCases(Base):
         import socket
         import threading
         import time
+
         from kin import site as site_mod
         self.kin("site", "build")
         with socket.socket() as s:

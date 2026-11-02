@@ -162,8 +162,9 @@ def export(case: Case, profile: str = "private", include_hypotheses: bool = Fals
     claims = [c for c in case.rows("claims") if c["status"] not in CLOSED
               and (include_hypotheses or c["status"] in EVIDENCED)]
     used_sources: set[str] = set()
+    today = dt.date.today()
     out = ["0 HEAD", "1 SOUR KINSHIP-KIT", f"2 VERS {__version__}", "2 NAME kinship-kit", "1 GEDC", "2 VERS 5.5.1",
-           "2 FORM LINEAGE-LINKED", "1 CHAR UTF-8", f"1 DATE {_ged_point({'day': dt.date.today().day, 'month': dt.date.today().month, 'year': dt.date.today().year})}",
+           "2 FORM LINEAGE-LINKED", "1 CHAR UTF-8", f"1 DATE {_ged_point({'day': today.day, 'month': today.month, 'year': today.year})}",
            f"1 NOTE kinship-kit export, profile={profile}"]
     if case.config.get("case_id"):
         out.append(f"1 _KIN_CASE {case.config['case_id']}")
@@ -236,7 +237,7 @@ def export(case: Case, profile: str = "private", include_hypotheses: bool = Fals
         ps = sorted(set(ps))[:2]
         f = fam(ps[0], ps[1] if len(ps) > 1 else None)
         f["children"].append(child)
-    for i, (key, f) in enumerate(sorted(families.items()), start=1):
+    for i, (_key, f) in enumerate(sorted(families.items()), start=1):
         out += _lines(0, "FAM", xref=f"@F{i:04d}@")
         partners = list(f["partners"])
         sexes = {p: persons[p].get("sex", "") for p in partners}

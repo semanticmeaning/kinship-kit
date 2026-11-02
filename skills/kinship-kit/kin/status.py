@@ -5,9 +5,8 @@
 """
 from __future__ import annotations
 
-import json
-
 import datetime as dt
+import json
 
 from . import audit, feedback, updates, workflow
 from .i18n import t
@@ -46,9 +45,9 @@ def collect(case: Case) -> dict:
     negative = [s for s in case.rows("searches") if s["result"] in ("not-found", "blocked", "error", "partial")]
     open_claims = [c for c in case.rows("claims") if c["status"] in ("unresolved", "contradicted")]
     tasks_by_h = {}
-    for t in tasks:
-        if t.get("hypothesis_id"):
-            tasks_by_h.setdefault(t["hypothesis_id"], []).append(t["task_id"])
+    for task in tasks:
+        if task.get("hypothesis_id"):
+            tasks_by_h.setdefault(task["hypothesis_id"], []).append(task["task_id"])
 
     nxt = workflow.next_summary(case)
     today = dt.date.today().isoformat()

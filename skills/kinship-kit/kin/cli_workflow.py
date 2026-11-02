@@ -300,7 +300,8 @@ def cmd_review(args) -> int:
     if args.action == "submit":
         row = workflow.submit_review(case, args.id, args.verdict or "", args.findings or "",
                                      split_ids(args.checked or ""), _actor(args))
-        _out(args, row, f"{args.id}: {row['status']}" + (" — нужно решение человека (kin review decide)" if row.get("human_required") == "yes" and row["status"] == "passed" else ""))
+        need_human = row.get("human_required") == "yes" and row["status"] == "passed"
+        _out(args, row, f"{args.id}: {row['status']}" + (" — нужно решение человека (kin review decide)" if need_human else ""))
         return 0
     if args.action == "decide":
         if not args.by:

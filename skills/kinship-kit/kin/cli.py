@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -12,8 +13,7 @@ from pathlib import Path
 
 from . import __version__, audit, cli_stage3, cli_workflow, i18n, publish, site, status, workflow
 from .i18n import t
-from .store import (REGISTERS, SCHEMA, Case, KinError, field_names, find_case_dir, init_case,
-                    register_by_prefix, sha256_file, split_ids)
+from .store import REGISTERS, SCHEMA, Case, KinError, field_names, find_case_dir, init_case, register_by_prefix, sha256_file, split_ids
 
 # ---------------------------------------------------------------- помощники
 
@@ -437,7 +437,7 @@ def cmd_line(args) -> int:
         raise KinError(f"Поля линии: {', '.join(LINE_FIELDS)}")
     if args.action == "list":
         lines = case.config.get("lines", [])
-        _out(args, lines, "\n".join(f"{l['id']}: {l.get('title', '')} — {l.get('state', '')}" for l in lines) or "(нет линий)")
+        _out(args, lines, "\n".join(f"{ln['id']}: {ln.get('title', '')} — {ln.get('state', '')}" for ln in lines) or "(нет линий)")
         return 0
     if not re.fullmatch(r"[a-z0-9-]+", args.id or ""):
         raise KinError("ID линии — латиница, цифры, дефис")
@@ -445,7 +445,7 @@ def cmd_line(args) -> int:
         raise KinError("color — в формате #b5651d")
     with case.lock():
         lines = case.config.setdefault("lines", [])
-        existing = next((l for l in lines if l["id"] == args.id), None)
+        existing = next((ln for ln in lines if ln["id"] == args.id), None)
         if args.action == "add":
             if existing:
                 raise KinError(f"Линия {args.id} уже есть")
@@ -507,10 +507,9 @@ def cmd_site_build(args) -> int:
 
 def cmd_site_serve(args) -> int:
     case = _case(args)
-    if args.host not in ("127.0.0.1", "localhost", "::1"):
-        if not args.i_know_its_public or args.profile != "public":
-            raise KinError("Внешний адрес — только для --profile public и с флагом --i-know-its-public. "
-                           "Приватную сборку смотрите на localhost или выкладывайте за паролем (docs, этап 2).")
+    if args.host not in ("127.0.0.1", "localhost", "::1") and (not args.i_know_its_public or args.profile != "public"):
+        raise KinError("Внешний адрес — только для --profile public и с флагом --i-know-its-public. "
+                       "Приватную сборку смотрите на localhost или выкладывайте за паролем (docs, этап 2).")
     if not args.no_rebuild or not (case.root / "site" / args.profile / "index.html").is_file():
         _require_clean_audit(case, args)  # всегда свежая сборка: старая могла содержать уже скрытых людей
         site.build(case, args.profile)
@@ -729,10 +728,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
-        try:
+        with contextlib.suppress(AttributeError, ValueError):
             stream.reconfigure(encoding="utf-8")
-        except (AttributeError, ValueError):
-            pass
     args = build_parser().parse_args(argv)
     case_lang = None
     try:  # язык дела — без открытия реестров (дело может требовать миграции)

@@ -95,11 +95,7 @@ def _related_artifacts(case: Case, register: str, row: dict) -> set[str]:
             m = case.index("mentions").get(mid)
             if m:
                 ids.add(m["artifact_id"])
-    elif register == "relationships":
-        ids |= set(split_ids(row.get("supporting_artifact_ids")) + split_ids(row.get("contradicting_artifact_ids")))
-        for cid in split_ids(row.get("claim_ids")):
-            ids |= _related_artifacts(case, "claims", claims.get(cid, {}))
-    elif register == "hypotheses":
+    elif register in ("relationships", "hypotheses"):
         ids |= set(split_ids(row.get("supporting_artifact_ids")) + split_ids(row.get("contradicting_artifact_ids")))
         for cid in split_ids(row.get("claim_ids")):
             ids |= _related_artifacts(case, "claims", claims.get(cid, {}))
@@ -217,9 +213,7 @@ def _linked_ids(case: Case, target: str) -> set[str]:
     """Записи, изменение которых делает ревью устаревшим: сама запись, её утверждения и источники."""
     register, row = case.get(target)
     ids = {target}
-    if register == "hypotheses":
-        ids |= set(split_ids(row.get("claim_ids")))
-    elif register == "relationships":
+    if register in ("hypotheses", "relationships"):
         ids |= set(split_ids(row.get("claim_ids")))
     ids |= _related_artifacts(case, register, row)
     return ids
@@ -536,7 +530,9 @@ def next_summary(case: Case) -> dict | None:
         return {"kind": "continue-task", "id": top["id"], "text": f"{t('Продолжить')} {top['id']}: {top['goal']}"}
     if pending:
         r = pending[0]
-        return {"kind": "review", "id": r["review_id"], "text": f"{t('Независимое ревью')} {r['review_id']} ({r['target_id']}) — {t('роль')} {r.get('reviewer') or 'Evidence Reviewer'}"}
+        role = r.get("reviewer") or "Evidence Reviewer"
+        return {"kind": "review", "id": r["review_id"],
+                "text": f"{t('Независимое ревью')} {r['review_id']} ({r['target_id']}) — {t('роль')} {role}"}
     if ranked:
         top = ranked[0]
         return {"kind": "start-task", "id": top["id"],

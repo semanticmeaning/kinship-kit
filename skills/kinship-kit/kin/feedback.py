@@ -6,6 +6,7 @@ E-mail автора хранится только в черновике и ни�
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import functools
 import http.server
@@ -240,7 +241,5 @@ def serve(case: Case, port: int = 8791, host: str = "127.0.0.1", public_host: st
     handler = functools.partial(handler_cls, directory=str(out))
     with http.server.ThreadingHTTPServer((host, port), handler) as httpd:
         print(f"Сведения семьи: http://{host}:{port}/ (форма в профиле человека; Ctrl+C — остановить)")
-        try:
+        with contextlib.suppress(KeyboardInterrupt):
             httpd.serve_forever()
-        except KeyboardInterrupt:
-            pass

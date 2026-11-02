@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
-from . import edtf
 from .store import REGISTERS, Case, sha256_file, split_ids
 
 CORROBORATED = {"corroborated", "strongly-corroborated"}
@@ -109,7 +108,7 @@ def run(case: Case) -> dict:
 
     # 4а. Противоречия по датам должны быть видны: одинаковый факт, разные даты, без взаимной ссылки
     by_fact = defaultdict(list)
-    for cid, c in claims.items():
+    for c in claims.values():
         if c["claim_type"] in DATE_FACTS and c.get("date") and c["status"] not in CLOSED_CLAIM:
             for pid in split_ids(c["subject_person_ids"]):
                 by_fact[(case.resolve_person(pid), c["claim_type"])].append(c)

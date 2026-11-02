@@ -22,7 +22,7 @@ V1 = json.loads((REPO / "skills" / "kinship-kit" / "kin" / "schemas" / "v1.json"
 class TestMigration(Base):
     def make_v1(self):
         reg = self.case / "registry"
-        for name, spec in V1["registers"].items():
+        for _name, spec in V1["registers"].items():
             with open(reg / spec["file"], "w", encoding="utf-8", newline="") as fh:
                 csv.writer(fh, lineterminator="\n").writerow([f["name"] for f in spec["fields"]])
         for extra in ("reviews.csv", "requests.csv"):

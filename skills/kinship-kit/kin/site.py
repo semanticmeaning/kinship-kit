@@ -5,6 +5,7 @@ kin site serve → http://127.0.0.1:8080 (только локальный адр
 """
 from __future__ import annotations
 
+import contextlib
 import functools
 import http.server
 import json
@@ -196,7 +197,7 @@ def check_layout(out: Path) -> list[str]:
                              capture_output=True, text=True, timeout=300)
     except (OSError, subprocess.TimeoutExpired) as e:
         return [f"предупреждение: проверка раскладки не выполнилась — {e}"]
-    return [] if res.returncode == 0 else [l for l in res.stdout.splitlines() if l.strip()]
+    return [] if res.returncode == 0 else [line for line in res.stdout.splitlines() if line.strip()]
 
 
 class _Quiet(http.server.SimpleHTTPRequestHandler):
@@ -237,7 +238,5 @@ def serve(case: Case, profile: str = "private", port: int = 8080, host: str = "1
     handler = functools.partial(handler_cls, directory=str(out))
     with http.server.ThreadingHTTPServer((host, port), handler) as httpd:
         print(f"Схема ({profile}): http://{host}:{port}/   (Ctrl+C — остановить)")
-        try:
+        with contextlib.suppress(KeyboardInterrupt):
             httpd.serve_forever()
-        except KeyboardInterrupt:
-            pass
