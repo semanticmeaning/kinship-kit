@@ -188,6 +188,40 @@ class TestUpgrade(unittest.TestCase):
                 updates.CACHE, updates._get = old_cache, old_get
 
 
+class TestTranslations(unittest.TestCase):
+    """Подписи интерфейса переводятся по точному совпадению с русской строкой (kin/i18n.py, PHRASES).
+    Правка русской подписи без словаря молча вернула бы её по-русски в --lang en — этот тест не даёт так сделать."""
+
+    def test_every_label_has_translation(self):
+        import ast
+
+        from kin.i18n import PHRASES
+        kin_dir = REPO / "skills" / "kinship-kit" / "kin"
+        trees = {f.name: ast.parse(f.read_text(encoding="utf-8")) for f in sorted(kin_dir.glob("*.py"))}
+        labels, unknown = [], []
+        for name, tree in trees.items():
+            for n in ast.walk(tree):
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "t" and n.args:
+                    a = n.args[0]
+                    if isinstance(a, ast.Constant) and isinstance(a.value, str):
+                        labels.append((a.value, f"{name}:{n.lineno}"))
+                    elif (name, ast.unparse(a)) not in {("cli.py", "verb"), ("status.py", "label")}:
+                        unknown.append(f"{name}:{n.lineno} t({ast.unparse(a)})")
+        # подписи, которые приходят в t() через переменную
+        for n in ast.walk(trees["cli.py"]):
+            if isinstance(n, ast.FunctionDef) and n.name == "_print_row":
+                labels += [(d.value, "cli.py:_print_row") for d in n.args.defaults if isinstance(d, ast.Constant)]
+            if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "_print_row" and len(n.args) > 2:
+                labels.append((n.args[2].value, f"cli.py:{n.lineno}"))
+        for n in ast.walk(trees["status.py"]):
+            if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "labels" and isinstance(n.value, ast.Dict):
+                labels += [(v.value, f"status.py:{n.lineno}") for v in n.value.values]
+        self.assertEqual(unknown, [], "t() с переменной: добавьте её значения в этот тест")
+        self.assertGreater(len(labels), 50)
+        missing = sorted({f"{where}: {text!r}" for text, where in labels if text not in PHRASES})
+        self.assertEqual(missing, [], "нет перевода в kin/i18n.py → PHRASES")
+
+
 class TestPython310Compat(unittest.TestCase):
     def test_no_backslash_in_fstring_expressions(self):
         """Python 3.10–3.11: обратный слэш внутри {…} f-строки — синтаксическая ошибка (CI проверяет 3.10)."""
