@@ -741,6 +741,11 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         with contextlib.suppress(AttributeError, ValueError):
             stream.reconfigure(encoding="utf-8")
+    skill_dir = Path(__file__).resolve().parent.parent
+    if not (skill_dir / "SKILL.md").is_file():  # пакет поставлен без папки навыка (pip/pipx без -e)
+        print("kin установлен без папки навыка (роли, шаблоны, скачиватели). Ставьте из клона: "
+              "pipx install -e <папка kinship-kit> или sh install.sh", file=sys.stderr)
+        return 2
     args = build_parser().parse_args(argv)
     case_lang = None
     try:  # язык дела — без открытия реестров (дело может требовать миграции)

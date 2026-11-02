@@ -153,6 +153,7 @@ class TestUpgrade(unittest.TestCase):
         from kin import __version__, updates
         skill = (REPO / "skills" / "kinship-kit" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn(f'version: "{__version__}"', skill)
+        self.assertIn(f'version = "{__version__}"', (REPO / "pyproject.toml").read_text(encoding="utf-8"))
         log = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
         self.assertIn(f"## [{__version__}]", log)
         self.assertEqual(updates.changes_since(log, __version__), "")

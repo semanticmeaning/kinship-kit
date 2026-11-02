@@ -1,0 +1,30 @@
+# Установка команды kin из клона: pipx install -e .   (или uv tool install -e .)
+# Только в режиме -e: kin берёт роли, шаблоны, скачиватели и SKILL.md из папки навыка рядом с пакетом,
+# поэтому обычная установка колеса (без -e) не поддерживается — kin сообщит об этом при запуске.
+# Навык для Claude Code / Codex ставится отдельно: sh install.sh (README).
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kinship-kit"
+version = "0.5.0"   # = kin/__init__.py и SKILL.md (сверяет тест)
+description = "Evidence-first, AI-assisted genealogy toolkit: skill, kin CLI, MCP server, family-tree site"
+readme = "README.en.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = []   # только стандартная библиотека
+
+[project.urls]
+Homepage = "https://github.com/semanticmeaning/kinship-kit"
+Changelog = "https://github.com/semanticmeaning/kinship-kit/blob/main/CHANGELOG.md"
+
+[project.scripts]
+kin = "kin.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "skills/kinship-kit" }
+packages = ["kin"]
+
+[tool.setuptools.package-data]
+kin = ["schema.json", "schemas/*.json", "web/*", "web/icons/*"]
