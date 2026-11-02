@@ -26,4 +26,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m unittest discover -s tests -v
+      - shell: bash
+        run: python -m unittest discover -s tests 2>&1 | tee unittest.log; exit ${PIPESTATUS[0]}
+      - if: failure()
+        shell: bash
+        run: python tools/ci_annotate.py unittest.log   # упавшие тесты — аннотациями (видны без входа на GitHub)
