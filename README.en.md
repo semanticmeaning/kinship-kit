@@ -4,6 +4,12 @@ An evidence-first genealogy toolkit for AI agents (Claude Code, Codex, any MCP c
 CLI** (all case operations, Python standard library only) + a **family-tree site** (local or published).
 Family data lives in a separate private case folder — on your computer or server. Focus: former USSR and the Russian Empire.
 
+**Who it is for.** People tracing ancestors in archives of the former USSR and the Russian Empire with an AI agent.
+**What it solves.** An agent finds and matches records fast, but easily mistakes a namesake for a great-grandfather,
+forgets where it has already searched, and blurs guesses with proof. Here every conclusion is tied to a source,
+hypotheses and empty searches are kept, significant decisions are checked by another role, and living relatives
+stay out of the public version.
+
 **Demo:** https://semanticmeaning.github.io/kinship-kit/ — the family-tree site of a fictional family (public and private views, RU/EN).
 
 ![Family-tree site: generations, hypotheses, a profile with sources and competing versions](docs/img/demo-ru.png)
@@ -15,6 +21,8 @@ git clone https://github.com/semanticmeaning/kinship-kit.git && cd kinship-kit
 sh install.sh            # skill → ~/.claude/skills and ~/.agents/skills, plus the `kin` command
 kin --lang en setup      # asks: main surname, case title and folder, commit author (a pseudonym is fine), roles
 ```
+Alternatively, install the `kin` command with `pipx install -e .` (or `uv tool install -e .`) in the clone — editable
+mode only, since roles, templates and downloaders are read from the clone. The agent skill itself is installed by `install.sh`.
 Or ask your agent: “Use the kinship-kit skill, let's research the … family” — it asks the same questions first.
 
 ## Work
