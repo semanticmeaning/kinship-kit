@@ -594,6 +594,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_init)
 
     src = sub.add_parser("source", help="Источники").add_subparsers(dest="sub", required=True)
+    p = src.add_parser("import-download", help="Сканы из папки выгрузки скачивателя → источники дела (без дублей)")
+    p.add_argument("folder")
+    p.add_argument("--task", help="Задача, к которой относится выгрузка")
+    p.add_argument("--dry-run", action="store_true")
+    _common(p)
+    p.set_defaults(fn=cli_stage3.cmd_import_download)
     p = src.add_parser("add", help="Зарегистрировать источник: копия в sources/ + sha256")
     p.add_argument("file", nargs="?")
     _opts(p, SOURCE_MAP)

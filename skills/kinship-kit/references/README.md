@@ -30,4 +30,5 @@ v1.11.0 (MIT, © 2026 Denis Shiryaev) и адаптированы. Лиценз�
 | `search-result-validation.md` | Проверка найденной записи |
 | `ww1-search.md`, `chechnya-deportation.md`, `bessarabia-moldova.md`, `habsburg-galicia-bukovina.md` | Специальные направления |
 | `photo-search.md`, `familysearch-indexes.md`, `browser-and-captcha.md` | Инструменты и сайты |
+| `downloaders.md` | Выгрузка сканов из онлайн-просмотрщиков архивов: готовые адаптеры, новый сайт, правила |
 | `field-lessons.md`, `research-coordination.md` | Практика и работа нескольких исполнителей |

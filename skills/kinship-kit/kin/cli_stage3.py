@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 
-from . import exchange, feedback, gedcom, index, mcp_server, updates
+from . import downloaders, exchange, feedback, gedcom, index, mcp_server, updates
 from .store import Case, KinError, find_case_dir
 
 
@@ -134,6 +134,45 @@ def cmd_feedback(args) -> int:
     raise KinError(args.action)
 
 
+def _maybe_case_dir(args) -> Path | None:
+    try:
+        return find_case_dir(getattr(args, "case", None) or getattr(args, "case_global", None))
+    except KinError:
+        return None
+
+
+def cmd_downloader(args) -> int:
+    case_dir = _maybe_case_dir(args)
+    if args.action == "list":
+        found = downloaders.adapters(case_dir / "downloaders" if case_dir else None)
+        _out(args, {k: {x: str(y) for x, y in v.items()} for k, v in found.items()},
+             "\n".join(f"{k} — {v.get('title', '')} (v{v.get('version', '?')}, {v.get('site', '')})" for k, v in sorted(found.items()))
+             + "\nСборка: kin downloader build <адаптер> --out скрипт.js")
+        return 0
+    snippet, guide = downloaders.build(args.adapter, case_dir)
+    if args.out:
+        out = Path(args.out).expanduser().resolve()
+        if out.exists() and not args.force:
+            raise KinError(f"{out} уже существует — другое имя или --force")
+        out.write_text(snippet, encoding="utf-8")
+        print(f"Скрипт: {out} ({len(snippet)} знаков)\n\n{guide}")
+    else:
+        print(snippet)
+        print("/*\n" + guide + "*/")
+    return 0
+
+
+def cmd_import_download(args) -> int:
+    rep = downloaders.import_download(_case(args), Path(args.folder), _actor(args), args.task or "", args.dry_run)
+    text = (("Проверка (без записи): " if args.dry_run else "Загружено: ") + f"новых файлов {rep['new']}"
+            + (f", источники {rep['artifacts'][0]}…{rep['artifacts'][-1]}" if rep["artifacts"] else "")
+            + f"; уже были в деле {rep['skipped_known']}; не скачалось на сайте {rep['errors_on_site']} (см. _kinship-download.txt).")
+    if rep["artifacts"]:
+        text += "\nДальше: разобрать сканы — kin task new metric-books … (упоминания, утверждения)."
+    _out(args, rep, text)
+    return 0
+
+
 def cmd_update(args) -> int:
     if args.action == "check":
         r = updates.check()
@@ -150,6 +189,17 @@ def cmd_update(args) -> int:
 
 
 def add_commands(sub, common) -> None:
+    g = sub.add_parser("downloader", help="Скачиватели сканов из онлайн-архивов (вставка в консоль браузера)").add_subparsers(dest="sub", required=True)
+    p = g.add_parser("list", help="Поддержанные сайты")
+    common(p)
+    p.set_defaults(fn=cmd_downloader, action="list")
+    p = g.add_parser("build", help="Собрать скрипт для консоли и инструкцию")
+    p.add_argument("adapter")
+    p.add_argument("--out", help="Сохранить скрипт в файл (иначе — вывод на экран)")
+    p.add_argument("--force", action="store_true")
+    common(p)
+    p.set_defaults(fn=cmd_downloader, action="build")
+
     g = sub.add_parser("upgrade", help="Проверить новую версию набора на GitHub / обновить клон").add_subparsers(dest="sub", required=True)
     p = g.add_parser("check", help="Есть ли новая версия и что в ней изменилось")
     p.add_argument("--json", action="store_true")

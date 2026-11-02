@@ -4,7 +4,7 @@ description: Генеалогическое исследование (бывши
 license: MIT (основано на ex-ussr-kinship-research © 2026 Denis Shiryaev)
 compatibility: Python 3.10+ (только стандартная библиотека), shell. Claude Code, Codex и другие клиенты с поддержкой Agent Skills.
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
   language: "ru"
   reply_language: "user"
 ---
@@ -77,6 +77,7 @@ python3 <папка этого навыка>/kin.py <команда>      # да
 | Публикация живых (решает только автор дела) | человек: `kin update P-… publication=allow|deny`; всё дело: `kin case set privacy.public_living=allow --by «Имя»`; закрывать скрытое вместо остановки сборки: `kin case set privacy.on_leak=redact` |
 | Роли агентов | `kin agents install` → `.claude/agents/*.md`, `.codex/agents/*.toml` в папке дела |
 | Поиск по делу | `kin find <слова>` (имена в любом падеже, ё/е) |
+| Сканы дела из онлайн-архива | `kin downloader list` → `kin downloader build <адаптер> --out f.js` (скрипт для консоли браузера пользователя + инструкция) → `kin source import-download <папка> --task T-…`; нового сайта нет — адаптер по `references/downloaders.md` (пользователь присылает сохранённую страницу просмотрщика) |
 | Сведения семьи (форма на приватном сайте) | `kin case set feedback.enabled=true`, `kin feedback serve`, `kin feedback list|show`, решение — `kin feedback accept|reject FR-… --by «Имя»` |
 | Обмен и сохранность | `kin export --out f.json` / `kin import f.json` (без дублей), `kin gedcom export|import`, `kin backup` / `kin restore` |
 | MCP для клиентов без shell | `kin mcp config --client claude-code|claude-desktop|codex` |

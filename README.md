@@ -69,6 +69,7 @@ kin migrate --dry-run  # в каждом деле: нужна ли миграц�
 | Схема данных | `skills/kinship-kit/kin/schema.json`, `kin schema` |
 | Роли агентов | `skills/kinship-kit/roles/` → `kin agents install` |
 | Шаблоны заданий | `skills/kinship-kit/templates/tasks/` → `kin task new <тип>` |
+| Скачиватели сканов из онлайн-архивов (Архангельск, Курск, Яндекс Архивы; новый сайт — по сохранённой странице) | `skills/kinship-kit/downloaders/`, `kin downloader`, методика — `references/downloaders.md` |
 | Архитектура хранения | `docs/ARCHITECTURE.md`, решения — `docs/adr/` |
 | Независимое ревью | `docs/REVIEW.md` |
 | Выкладка сайта (Caddy, GitHub Pages), форма «сведения семьи» | `docs/deploy.md` |
