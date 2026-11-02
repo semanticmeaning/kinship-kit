@@ -43,6 +43,8 @@ def denylist() -> list[str]:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):  # Windows: консоль по умолчанию не в UTF-8, русский вывод падал бы
+        stream.reconfigure(encoding="utf-8", errors="replace")
     staged = "--staged" in sys.argv
     deny = [(t, re.compile(re.escape(t), re.IGNORECASE)) for t in denylist()]
     problems = []

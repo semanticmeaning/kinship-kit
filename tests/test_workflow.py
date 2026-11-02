@@ -250,7 +250,7 @@ class TestRequestsAgentsPublish(Base):
         self.assertTrue(st["requests_open"][0]["overdue"])
 
     def test_agents_install_formats(self):
-        out = self.kin("agents", "install").stdout
+        out = self.kin("agents", "install").stdout.replace("\\", "/")  # Windows печатает пути с «\»
         self.assertIn(".claude/agents/kin-evidence-reviewer.md", out)
         md = (self.case / ".claude" / "agents" / "kin-orchestrator.md").read_text(encoding="utf-8")
         self.assertTrue(md.startswith("---\nname: kin-orchestrator\ndescription: "))

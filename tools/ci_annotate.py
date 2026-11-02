@@ -29,5 +29,9 @@ def esc(s: str) -> str:
 summary = [ln for ln in text.splitlines() if ln.startswith(("Ran ", "OK", "FAILED"))]
 # GitHub показывает не больше 10 аннотаций на шаг: первая — итог и полный список, дальше — подробности
 print("::error title=итог::" + esc("\n".join(summary + [t for t, _ in items]) or "нет итога unittest"))
-for title, msg in items[:8]:
-    print(f"::error title={esc(title)}::{esc(msg[:3000])}")
+seen: dict[str, list[str]] = {}  # одинаковые причины — одной аннотацией, чтобы разные уместились в лимит
+for title, msg in items:
+    seen.setdefault(msg, []).append(title)
+for msg, titles in list(seen.items())[:8]:
+    head = titles[0] + (f" (+ ещё {len(titles) - 1} с той же ошибкой)" if len(titles) > 1 else "")
+    print(f"::error title={esc(head)}::{esc(msg[:3000])}")

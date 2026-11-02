@@ -26,6 +26,8 @@ def kin(case: Path, *args: str) -> str:
 
 
 def main() -> None:
+    for stream in (sys.stdout, sys.stderr):  # Windows: консоль по умолчанию не в UTF-8, русский вывод падал бы
+        stream.reconfigure(encoding="utf-8", errors="replace")
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     case = Path(sys.argv[1]).expanduser().resolve()
