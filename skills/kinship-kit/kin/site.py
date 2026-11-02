@@ -24,6 +24,16 @@ CSS_STUB = """/* Личное оформление сайта этого дел�
 """
 
 
+def translate(html: str, lang: str) -> str:
+    """Подписи интерфейса страницы → другой язык (точные замены из web/i18n-<lang>.json; данные не затрагиваются)."""
+    path = WEB / f"i18n-{lang}.json"
+    if not path.is_file():
+        return html
+    for src, dst in json.loads(path.read_text(encoding="utf-8")):
+        html = html.replace(src, dst)
+    return html
+
+
 def theme_init(case: Case, full: bool) -> list[Path]:
     """Создать theme/custom.css (и с full — копию страницы theme/index.html) в папке дела."""
     theme = case.root / THEME_DIR
@@ -140,7 +150,12 @@ def build(case: Case, profile: str = "private") -> Path:
     if (theme / "custom.css").is_file():  # личное оформление дела поверх общего шаблона
         shutil.copy(theme / "custom.css", out / "custom.css")
         html = html.replace("</head>", '<link rel="stylesheet" href="custom.css">\n</head>', 1)
-    (out / "index.html").write_text(html, encoding="utf-8")
+    # две версии интерфейса на одних данных: русская — исходная, английская — замена подписей по словарю
+    versions = {"ru": html, "en": translate(html, "en")}
+    for lang, text in versions.items():
+        (out / f"index.{lang}.html").write_text(text, encoding="utf-8")
+    default = case.config.get("language", "ru")
+    (out / "index.html").write_text(versions.get(default, html), encoding="utf-8")
     for icons in (WEB / "icons", theme / "icons"):  # иконки страницы (пол на карточках); своя тема может их заменить
         if icons.is_dir():
             (out / "icons").mkdir(exist_ok=True)

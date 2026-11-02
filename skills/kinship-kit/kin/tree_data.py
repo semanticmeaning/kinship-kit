@@ -26,6 +26,8 @@ ACTIVE = {".html", ".htm", ".xhtml", ".shtml", ".svg", ".svgz", ".xml", ".xsl", 
 REL_T = {"parent-of": "parent", "spouse-of": "spouse", "sibling-of": "sibling", "other": "kinship"}
 CLAIM_T = {"parentage": "parent", "sibling": "sibling", "kinship": "kinship", "identity": "identity"}
 CAND = {"candidate", "hypothesis", "unlikely"}
+GEN_NAME_EN = {-1: "Parents", -2: "Grandparents", -3: "Great-grandparents", -4: "2× great-grandparents",
+               1: "Children", 2: "Grandchildren", 3: "Great-grandchildren"}
 GEN_NAME = {-1: "Родители", -2: "Деды и бабушки", -3: "Прадеды", -4: "Прапрадеды", 1: "Дети", 2: "Внуки", 3: "Правнуки"}
 PALETTE = ["#c2410c", "#1d4ed8", "#7c3aed", "#0f766e", "#b91c1c", "#15803d", "#a16207", "#be185d", "#0369a1",
            "#4d7c0f", "#92400e", "#0e7490"]
@@ -337,7 +339,9 @@ def build(case: Case, profile: str, pub: dict) -> tuple[dict, list[tuple[Path, s
             lo = hi = 0
         name = (("Поколение: " + root_given) if root_given else "Поколение корня") if g == 0 else \
             GEN_NAME.get(g) or (f"{-g - 2}× прадеды" if g < 0 else f"{g - 1}× правнуки")
-        gens[str(g)] = {"name": name, "from": lo // 5 * 5, "to": -(-hi // 5) * 5}
+        name_en = (("Generation: " + root_given) if root_given else "Root generation") if g == 0 else \
+            GEN_NAME_EN.get(g) or (f"{-g - 2}× great-grandparents" if g < 0 else f"{g - 1}× great-grandchildren")
+        gens[str(g)] = {"name": name, "name_en": name_en, "from": lo // 5 * 5, "to": -(-hi // 5) * 5}
 
     # --- сведения семьи (принятые исследователем; только приватная версия; e-mail не выводится)
     fb_items = []

@@ -513,3 +513,42 @@ class TestSiteAssets(Base):
         self.assertTrue(refs, "страница должна ссылаться на иконки")
         missing = [r for r in refs if not (out / r).is_file() and r != "custom.css"]
         self.assertEqual(missing, [])
+
+
+class TestSiteLanguages(Base):
+    def test_dictionary_matches_template_and_both_versions_built(self):
+        web = REPO / "skills" / "kinship-kit" / "kin" / "web"
+        page = (web / "index.html").read_text(encoding="utf-8")
+        pairs = json.loads((web / "i18n-en.json").read_text(encoding="utf-8"))
+        self.assertEqual([a[:60] for a, b in pairs if a not in page], [])  # шаблон изменили — обновите словарь
+        self.person("Ветлугин Сергей")
+        self.kin("site", "build")
+        out = self.case / "site" / "private"
+        ru, en, default = ((out / n).read_text(encoding="utf-8") for n in ("index.ru.html", "index.en.html", "index.html"))
+        self.assertIn("const PAGE_LANG = 'en';", en)
+        self.assertIn(">RU<", en)
+        self.assertIn(">EN<", ru)
+        self.assertEqual(default, ru)  # язык дела — ru
+
+    def test_english_page_has_no_russian_ui(self):
+        import html as htmllib
+        import re
+        import shutil as sh
+        chrome = next((p for p in (sh.which("google-chrome"), "/opt/google/chrome/chrome") if p and Path(p).exists()), None)
+        if not chrome:
+            self.skipTest("нужен Chrome")
+        with tempfile.TemporaryDirectory() as tmp:
+            case = Path(tmp) / "en"
+            subprocess.run([sys.executable, str(REPO / "examples" / "demo" / "build_demo_en.py"), str(case)], check=True,
+                           capture_output=True)
+            run("site", "build", case=case)
+            page = case / "site" / "private" / "index.en.html"
+            dom = subprocess.run([chrome, "--headless=new", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=5000",
+                                  f"--user-data-dir={tmp}/chrome", "--allow-file-access-from-files", "--dump-dom",
+                                  page.as_uri() + "#P-0002"], capture_output=True, text=True, timeout=120).stdout
+            dom = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", dom, flags=re.S)
+            text = htmllib.unescape(re.sub(r"<[^>]+>", " ", dom)) + " " + " ".join(re.findall(r'(?:title|aria-label|placeholder)="([^"]*)"', dom))
+            self.assertIn("Facts and their evidence", text)  # профиль отрисован
+            russian = sorted({x.strip() for x in re.findall(r"[А-Яа-яЁё][А-Яа-яЁё ]*", text)} - {"Русская версия"})
+            self.assertEqual(russian, [])
+            unlock(case)

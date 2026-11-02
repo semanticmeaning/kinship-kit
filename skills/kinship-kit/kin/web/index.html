@@ -257,6 +257,7 @@ details.sec > summary:hover { color: var(--ink); }
   <button class="btn sq" id="zin" title="Крупнее" aria-label="Крупнее">+</button>
   <button class="btn sq" id="zout" title="Мельче" aria-label="Мельче">−</button>
   <button class="btn" id="famtog" aria-pressed="false" title="Раскрасить карточки по семьям">По семьям<svg class="famx" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
+  <button class="btn" id="langtog" title="English version">EN</button>
   <div id="fams" hidden></div>
 </div>
 
@@ -317,6 +318,7 @@ const S = { expanded: new Set(), forced: new Set(), all: false, showRej: false, 
 let D, P, E, nb, CL, LN, minGen, maxGen;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const PAGE_LANG = 'ru';  // английская версия страницы собирается заменой подписей (kin/web/i18n-en.json)
 let ALIASES = [];  // варианты написания фамилии для поиска: case.json → site.search_aliases
 const norm = s => ALIASES.reduce((x, [a, b]) => x.split(a).join(b), s.toLowerCase().replace(/ё/g, 'е'));
 
@@ -327,6 +329,10 @@ fetch('tree.json', { cache: 'no-store' }).then(r => r.json()).then(init).catch(e
 function init(data) {
   D = data; ALIASES = D.meta.aliases || []; P = new Map(D.persons.map(p => [p.id, p])); E = D.edges;
   if (D.meta.title) document.title = D.meta.title;
+  // переключатель языка: index.ru.html / index.en.html (данные одни и те же), выбор запоминается
+  const otherLang = PAGE_LANG === 'ru' ? 'en' : 'ru', goLang = () => location.href = 'index.' + otherLang + '.html' + location.hash;
+  $('langtog').onclick = () => { try { localStorage.setItem('kin-lang', otherLang); } catch (e) {} goLang(); };
+  try { if (/(^|\/)(index\.html)?$/.test(location.pathname) && localStorage.getItem('kin-lang') === otherLang) { goLang(); return; } } catch (e) {}
   (D.families || []).forEach(f => { FAMCOL[f.key] = f.color; });
   D.claims.forEach(c => { c.q = norm([c.text, c.next].join(' ')); });
   CL = new Map(D.claims.map(c => [c.id, c])); LN = new Map(D.lines.map(l => [l.id, l]));

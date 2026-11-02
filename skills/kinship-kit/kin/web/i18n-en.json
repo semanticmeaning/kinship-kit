@@ -1,0 +1,490 @@
+[
+[
+"<html lang=\"ru\">",
+"<html lang=\"en\">"
+],
+[
+"const PAGE_LANG = 'ru';",
+"const PAGE_LANG = 'en';"
+],
+[
+"<title>Древо</title>",
+"<title>Family tree</title>"
+],
+[
+"content: \"Что нужно: \"",
+"content: \"What is needed: \""
+],
+[
+"content: \"Почему отброшено: \"",
+"content: \"Why rejected: \""
+],
+[
+"placeholder=\"Поиск: люди и утверждения\"",
+"placeholder=\"Search: people and claims\""
+],
+[
+"aria-label=\"Поиск по людям и утверждениям\"",
+"aria-label=\"Search people and claims\""
+],
+[
+"title=\"Крупнее\" aria-label=\"Крупнее\"",
+"title=\"Zoom in\" aria-label=\"Zoom in\""
+],
+[
+"title=\"Мельче\" aria-label=\"Мельче\"",
+"title=\"Zoom out\" aria-label=\"Zoom out\""
+],
+[
+"title=\"Раскрасить карточки по семьям\">По семьям<",
+"title=\"Colour cards by family\">By family<"
+],
+[
+"title=\"English version\">EN<",
+"title=\"Русская версия\">RU<"
+],
+[
+"aria-label=\"Легенда\"",
+"aria-label=\"Legend\""
+],
+[
+"<b>Легенда</b>",
+"<b>Legend</b>"
+],
+[
+"aria-controls=\"lg-body\">Скрыть<",
+"aria-controls=\"lg-body\">Hide<"
+],
+[
+"</svg>2+ документа<",
+"</svg>2+ documents<"
+],
+[
+"</span>человек из дерева<",
+"</span>person from a family tree<"
+],
+[
+"</svg>1 документ<",
+"</svg>1 document<"
+],
+[
+"</span>кандидат из архива<",
+"</span>archive candidate<"
+],
+[
+"</svg>семейные сведения<",
+"</svg>family information<"
+],
+[
+"<b>тёмный ✓</b>&nbsp;— по документу",
+"<b>dark ✓</b>&nbsp;— by a document"
+],
+[
+"</svg>гипотеза поиска<",
+"</svg>research hypothesis<"
+],
+[
+">серый — не подтверждено<",
+">grey — not confirmed<"
+],
+[
+"</svg>возможно, одно лицо<",
+"</svg>possibly the same person<"
+],
+[
+"</svg>отброшено<",
+"</svg>rejected<"
+],
+[
+"</svg>супруги<",
+"</svg>spouses<"
+],
+[
+"</svg>брак расторгнут<",
+"</svg>marriage dissolved<"
+],
+[
+">наведите на человека — его линии<",
+">hover a person to see their lines<"
+],
+[
+">Иконки: kareemovic2000",
+">Icons: kareemovic2000"
+],
+[
+"aria-label=\"Документы\"",
+"aria-label=\"Documents\""
+],
+[
+"title=\"Вписать\">Вписать<",
+"title=\"Fit\">Fit<"
+],
+[
+"title=\"Закрыть (Esc)\" aria-label=\"Закрыть\"",
+"title=\"Close (Esc)\" aria-label=\"Close\""
+],
+[
+"aria-label=\"Предыдущая страница\"",
+"aria-label=\"Previous page\""
+],
+[
+"aria-label=\"Следующая страница\"",
+"aria-label=\"Next page\""
+],
+[
+"role=\"tab\">Линии поиска<",
+"role=\"tab\">Search lines<"
+],
+[
+"role=\"tab\">Человек<",
+"role=\"tab\">Person<"
+],
+[
+"title=\"Свернуть панель\" aria-label=\"Свернуть панель\"",
+"title=\"Collapse panel\" aria-label=\"Collapse panel\""
+],
+[
+"const LV_NAME = { doc2: 'подтверждено', doc1: 'подтверждено', family: 'семейные сведения', hyp: 'гипотеза', research: 'гипотеза', open: 'не решено', rejected: 'отброшено' };",
+"const LV_NAME = { doc2: 'confirmed', doc1: 'confirmed', family: 'family information', hyp: 'hypothesis', research: 'hypothesis', open: 'unresolved', rejected: 'rejected' };"
+],
+[
+"'tree-entry-unverified': 'запись семейного дерева', candidate: 'кандидат из архивных источников', hypothesis: 'гипотетический предок',",
+"'tree-entry-unverified': 'family tree entry', candidate: 'candidate from archive sources', hypothesis: 'hypothetical ancestor',"
+],
+[
+"'identity-probable': 'личность подтверждена документами (вероятно)', 'identity-confirmed': 'личность подтверждена документами',",
+"'identity-probable': 'identity supported by documents (probable)', 'identity-confirmed': 'identity confirmed by documents',"
+],
+[
+"'family-reported': 'со слов семьи', unlikely: 'маловероятный кандидат' };",
+"'family-reported': 'family-reported', unlikely: 'unlikely candidate' };"
+],
+[
+"const LIV_NAME = { living: 'жив(а)', deceased: 'умер(ла)', 'probably-deceased': 'вероятно, умер(ла)', 'possibly-living': 'возможно, жив(а)', unknown: 'неизвестно' };",
+"const LIV_NAME = { living: 'living', deceased: 'deceased', 'probably-deceased': 'probably deceased', 'possibly-living': 'possibly living', unknown: 'unknown' };"
+],
+[
+"const T_NAME = { parent: 'родитель', spouse: 'супруг(а)', sibling: 'брат/сестра', cousin: 'двоюродные', kinship: 'родство', identity: 'одно лицо?' };",
+"const T_NAME = { parent: 'parent', spouse: 'spouse', sibling: 'sibling', cousin: 'cousins', kinship: 'kinship', identity: 'same person?' };"
+],
+[
+"Не удалось загрузить данные схемы (${esc(err.message)}). Обновите страницу.",
+"Could not load the tree data (${esc(err.message)}). Reload the page."
+],
+[
+"`Версия: <b>${esc(m.schema || '—')}</b> · данные ${esc(m.version)}`",
+"`Version: <b>${esc(m.schema || '—')}</b> · data ${esc(m.version)}`"
+],
+[
+"`<br>Изменено: ${esc(when)}<br>Автор: ${ch.chat ? `<b>чат «${esc(ch.chat)}»</b>` : 'без подписи чата'}`",
+"`<br>Changed: ${esc(when)}<br>Author: ${ch.chat ? `<b>chat “${esc(ch.chat)}”</b>` : 'no chat signature'}`"
+],
+[
+"toLocaleString('ru-RU'",
+"toLocaleString('en-GB'"
+],
+[
+"on ? 'Выключить режим «По семьям»' : 'Раскрасить карточки по семьям'",
+"on ? 'Turn off “By family” mode' : 'Colour cards by family'"
+],
+[
+"'Показать все семьи' : 'Оставить цветной только эту семью'",
+"'Show all families' : 'Keep only this family coloured'"
+],
+[
+"<div class=\"nm\">Живой человек</div>",
+"<div class=\"nm\">Living person</div>"
+],
+[
+"'possibly-living' ? 'р. ' : ''",
+"'possibly-living' ? 'b. ' : ''"
+],
+[
+"`<b>✓ ${p.docs} док.</b>`",
+"`<b>✓ ${p.docs} doc.</b>`"
+],
+[
+"badges.push('<i>кандидат</i>')",
+"badges.push('<i>candidate</i>')"
+],
+[
+"badges.push('со слов семьи')",
+"badges.push('family-reported')"
+],
+[
+"title=\"Свернуть родню\" aria-label=\"Свернуть родню\"",
+"title=\"Collapse relatives\" aria-label=\"Collapse relatives\""
+],
+[
+"title=\"Показать родню: ${n}\" aria-label=\"Показать родню: ${n}\"",
+"title=\"Show relatives: ${n}\" aria-label=\"Show relatives: ${n}\""
+],
+[
+"'родитель → ребёнок'",
+"'parent → child'"
+],
+[
+"(rej ? 'отброшено' : e.t === 'identity' ? 'одно лицо?' : (e.need ? 'нужно: ' + e.need",
+"(rej ? 'rejected' : e.t === 'identity' ? 'same person?' : (e.need ? 'needed: ' + e.need"
+],
+[
+"/ждём/.test(l.state)",
+"/ждём|await|wait/i.test(l.state)"
+],
+[
+"<div class=\"sub\">Открытых гипотез нет.</div>",
+"<div class=\"sub\">No open hypotheses.</div>"
+],
+[
+"<h4>Прочее</h4>",
+"<h4>Other</h4>"
+],
+[
+"`<h3>Показ</h3>",
+"`<h3>Display</h3>"
+],
+[
+"> Показать отброшенное</label>",
+"> Show rejected</label>"
+],
+[
+"`<h3>Отброшено</h3>`",
+"`<h3>Rejected</h3>`"
+],
+[
+"`<div class=\"meta\">Данные на ${esc(D.meta.asof)} · версия ${esc(D.meta.version)} · ${D.persons.length} чел., ${D.edges.length} связей</div>`",
+"`<div class=\"meta\">Data as of ${esc(D.meta.asof)} · version ${esc(D.meta.version)} · ${D.persons.length} people, ${D.edges.length} links</div>`"
+],
+[
+"title=\"Документы: ${files}\" aria-label=\"Документы: ${files}\"",
+"title=\"Documents: ${files}\" aria-label=\"Documents: ${files}\""
+],
+[
+"'Источники на внешних сайтах' : 'Открыть источник на внешнем сайте'",
+"'Sources on external sites' : 'Open the source on an external site'"
+],
+[
+"aria-label=\"Внешний источник\"",
+"aria-label=\"External source\""
+],
+[
+"`<h2>Живой человек</h2><p class=\"sub\">Данные живых людей на схеме не показываются.</p>`",
+"`<h2>Living person</h2><p class=\"sub\">Data about living people is not shown on the tree.</p>`"
+],
+[
+"' <span class=\"ok-mark\">✓ документ</span>'",
+"' <span class=\"ok-mark\">✓ document</span>'"
+],
+[
+"[dt(p.b, 'род. '), dt(p.d, 'смерть: ')]",
+"[dt(p.b, 'born: '), dt(p.d, 'died: ')]"
+],
+[
+"[['Как в записи', p.written], ['Варианты', p.variants], ['Годы', yrs], ['Места', p.places], ['Юрисдикция', p.juris], ['Занятие', p.occ],",
+"[['As recorded', p.written], ['Variants', p.variants], ['Years', yrs], ['Places', p.places], ['Jurisdiction', p.juris], ['Occupation', p.occ],"
+],
+[
+"['Вероисп.', p.conf], ['Статус',",
+"['Religion', p.conf], ['Status',"
+],
+[
+"['Родня по записям', p.reported]]",
+"['Relatives in records', p.reported]]"
+],
+[
+"${k === 'Годы' ? v : esc(v)}",
+"${k === 'Years' ? v : esc(v)}"
+],
+[
+"role = e.a === p.id ? 'ребёнок' : 'родитель';",
+"role = e.a === p.id ? 'child' : 'parent';"
+],
+[
+"sec('Сведения', `<dl",
+"sec('Details', `<dl"
+],
+[
+"sec('Факты и их подтверждение',",
+"sec('Facts and their evidence',"
+],
+[
+"sec('Связи', rels)",
+"sec('Relationships', rels)"
+],
+[
+"sec('Заметки исследования',",
+"sec('Research notes',"
+],
+[
+"sec('Источники (шифры)', (p.arts || []).map(artLine).join('') || '<div class=\"sub\">Нет</div>')",
+"sec('Sources (references)', (p.arts || []).map(artLine).join('') || '<div class=\"sub\">None</div>')"
+],
+[
+"` · о связи: ${esc(f.relation)}",
+"` · about the link: ${esc(f.relation)}"
+],
+[
+"` · о ${plink(f.person)}`",
+"` · about ${plink(f.person)}`"
+],
+[
+"f.kind === 'other' ? ' · другое' : ''",
+"f.kind === 'other' ? ' · other' : ''"
+],
+[
+"(e.a === p.id ? 'ребёнок' : 'родитель') : T_NAME[e.t]",
+"(e.a === p.id ? 'child' : 'parent') : T_NAME[e.t]"
+],
+[
+">связь: ${esc(role)} — ${esc(pname(o))}<",
+">link: ${esc(role)} — ${esc(pname(o))}<"
+],
+[
+"sec('Сведения семьи', items)",
+"sec('Family information', items)"
+],
+[
+"sec('Сведения семьи', `${items || '<div class=\"sub\">Принятых сведений пока нет. Если вы что-то знаете об этом человеке или его родных — напишите: сообщение появится здесь после проверки.</div>'}",
+"sec('Family information', `${items || '<div class=\"sub\">No accepted information yet. If you know something about this person or their family, write it here: your message will appear after it has been checked.</div>'}"
+],
+[
+"<label for=\"fb-about\">О ком или о чём</label>",
+"<label for=\"fb-about\">About whom or what</label>"
+],
+[
+"${esc(p.name)} — сам человек</option>",
+"${esc(p.name)} — this person</option>"
+],
+[
+"<option value=\"other\">Другое: новый родственник, семейная история</option>",
+"<option value=\"other\">Other: a new relative, a family story</option>"
+],
+[
+"<label for=\"fb-text\">Что вы знаете</label>",
+"<label for=\"fb-text\">What you know</label>"
+],
+[
+"placeholder=\"Даты, места, имена, кем приходился, откуда это известно: рассказ, документ, фото\"",
+"placeholder=\"Dates, places, names, how they were related, how you know it: a story, a document, a photo\""
+],
+[
+"<label for=\"fb-author\">Ваше имя *</label>",
+"<label for=\"fb-author\">Your name *</label>"
+],
+[
+"Согласен(на) на обработку моего имени и e-mail для работы над историей семьи</label>",
+"I agree that my name and e-mail may be processed for work on the family history</label>"
+],
+[
+"<div class=\"note\">Имя будет видно рядом с вашим сообщением. E-mail видит только исследователь — чтобы уточнить детали.</div>",
+"<div class=\"note\">Your name will be shown next to your message. Only the researcher sees your e-mail, to ask for details.</div>"
+],
+[
+"id=\"fb-send\">Отправить<",
+"id=\"fb-send\">Send<"
+],
+[
+"fail('Напишите текст сообщения (хотя бы 10 знаков).')",
+"fail('Write your message (at least 10 characters).')"
+],
+[
+"fail('Укажите ваше имя.')",
+"fail('Enter your name.')"
+],
+[
+"fail('Проверьте адрес электронной почты.')",
+"fail('Check your e-mail address.')"
+],
+[
+"fail('Отметьте согласие на обработку имени и e-mail.')",
+"fail('Tick the consent to process your name and e-mail.')"
+],
+[
+"msg.textContent = 'Отправляю…'",
+"msg.textContent = 'Sending…'"
+],
+[
+"`Не удалось отправить (ошибка ${r.status}). Попробуйте позже.`",
+"`Could not send (error ${r.status}). Please try later.`"
+],
+[
+"`Спасибо! Сообщение ${j.id} получено и ушло на проверку. Здесь оно появится после того, как исследователь его проверит и примет.`",
+"`Thank you! Message ${j.id} was received and sent for review. It will appear here once the researcher has checked and accepted it.`"
+],
+[
+"fail('Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.')",
+"fail('No connection to the server. Check your internet connection and try again.')"
+],
+[
+"e.lv === 'rejected' ? 'Отброшенная связь' : 'Гипотеза'",
+"e.lv === 'rejected' ? 'Rejected link' : 'Hypothesis'"
+],
+[
+"`<h3>Источники (шифры)</h3>${arts}`",
+"`<h3>Sources (references)</h3>${arts}`"
+],
+[
+"aria-label=\"Страница ${k + 1}\"",
+"aria-label=\"Page ${k + 1}\""
+],
+[
+"aria-label=\"Документ ${k + 1}\"",
+"aria-label=\"Document ${k + 1}\""
+],
+[
+"pre.textContent = 'Загрузка…'",
+"pre.textContent = 'Loading…'"
+],
+[
+"pre.textContent = 'Не удалось загрузить файл.'",
+"pre.textContent = 'Could not load the file.'"
+],
+[
+"<div class=\"other\">Файл ${esc(g.f)}<a href=\"${url}\" download>Скачать</a></div>",
+"<div class=\"other\">File ${esc(g.f)}<a href=\"${url}\" download>Download</a></div>"
+],
+[
+" · страница ${gi + 1} из ${G.length}",
+" · page ${gi + 1} of ${G.length}"
+],
+[
+">открыть PDF в новой вкладке</a>",
+">open the PDF in a new tab</a>"
+],
+[
+"`<br><span class=\"c\">Где именно: ",
+"`<br><span class=\"c\">Where exactly: "
+],
+[
+">Открыть на сайте источника ↗</a>",
+">Open on the source site ↗</a>"
+],
+[
+"'<div class=\"grp\">Люди</div>'",
+"'<div class=\"grp\">People</div>'"
+],
+[
+"esc(D.gens[p.gen]?.name || '')",
+"esc(D.gens[p.gen]?.name_en || D.gens[p.gen]?.name || '')"
+],
+[
+"'<div class=\"grp\">Утверждения</div>'",
+"'<div class=\"grp\">Claims</div>'"
+],
+[
+"'<div style=\"padding:8px 10px\" class=\"sub\">Ничего не нашлось</div>'",
+"'<div style=\"padding:8px 10px\" class=\"sub\">Nothing found</div>'"
+],
+[
+"textContent = open ? 'Скрыть' : 'Развернуть'",
+"textContent = open ? 'Hide' : 'Show'"
+],
+[
+"(в записи: ${esc(d.raw)})",
+"(as recorded: ${esc(d.raw)})"
+],
+[
+"esc(info.name)",
+"esc(info.name_en || info.name)"
+]
+]
