@@ -164,7 +164,7 @@ class TestSiteLanguages(Base):
             page = case / "site" / "private" / "index.en.html"
             dom = subprocess.run([chrome, "--headless=new", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=5000",
                                   f"--user-data-dir={tmp}/chrome", "--allow-file-access-from-files", "--dump-dom",
-                                  page.as_uri() + "#P-0002"], capture_output=True, text=True, timeout=120).stdout
+                                  page.as_uri() + "#P-0002"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120).stdout
             dom = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", dom, flags=re.S)
             text = htmllib.unescape(re.sub(r"<[^>]+>", " ", dom)) + " " + " ".join(re.findall(r'(?:title|aria-label|placeholder)="([^"]*)"', dom))
             self.assertIn("Facts and their evidence", text)  # профиль отрисован
@@ -192,7 +192,7 @@ class TestLayoutCheck(Base):
         self.assertEqual(site_mod.check_layout(out), [])
         # и английская версия страницы тоже
         res = subprocess.run(["node", str(REPO / "skills/kinship-kit/kin/web/check_layout.js"), str(out / "index.en.html"),
-                              str(out / "tree.json")], capture_output=True, text=True)
+                              str(out / "tree.json")], capture_output=True, text=True, encoding="utf-8", errors="replace")
         self.assertEqual(res.returncode, 0, res.stdout)
 
     def test_theme_page_script_is_not_run_in_node(self):

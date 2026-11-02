@@ -105,7 +105,7 @@ def notice() -> str:
 
 
 def _git(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(KIT_ROOT), *args], capture_output=True, text=True)
+    return subprocess.run(["git", "-C", str(KIT_ROOT), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def apply() -> str:

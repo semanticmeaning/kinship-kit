@@ -79,7 +79,7 @@ a{color:var(--accent)}
 
 
 def kin(case: Path, *args: str) -> None:
-    res = subprocess.run([sys.executable, str(KIN), "--case", str(case), *args], capture_output=True, text=True)
+    res = subprocess.run([sys.executable, str(KIN), "--case", str(case), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         sys.exit(f"kin {' '.join(args)}:\n{res.stderr}")
 

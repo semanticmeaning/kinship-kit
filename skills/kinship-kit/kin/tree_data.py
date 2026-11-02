@@ -59,7 +59,7 @@ def _date(value: str, ok: bool, conflict: bool, lang: str) -> dict | None:
 
 def _git_change(case: Case, public: bool) -> tuple[str, dict | None]:
     def git(*args):
-        r = subprocess.run(["git", "-C", str(case.root), *args], capture_output=True, text=True)
+        r = subprocess.run(["git", "-C", str(case.root), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
         return r.stdout.strip() if r.returncode == 0 else ""
     log = git("log", "-1", "--format=%h%x1f%cI%x1f%s%x1f%B", "--", "registry", "case.json")
     if not log:

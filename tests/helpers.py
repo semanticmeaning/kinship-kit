@@ -1,6 +1,7 @@
 """Общее для тестов: запуск kin, базовый класс с временным делом, демо-дело."""
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 import sys
@@ -12,6 +13,12 @@ REPO = Path(__file__).resolve().parent.parent
 SKILL = REPO / "skills" / "kinship-kit"
 KIN = SKILL / "kin.py"
 sys.path.insert(0, str(SKILL))
+
+# вывод тестов — в UTF-8, как у самого kin (cli.main): в Windows консоль по умолчанию в cp1252/cp1251,
+# и print русского текста из кода набора внутри теста (например, сервер в потоке) падал бы
+for _stream in (sys.stdout, sys.stderr):
+    with contextlib.suppress(AttributeError, ValueError):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 
 def run(*args, case: Path | None = None, ok: bool = True) -> subprocess.CompletedProcess:

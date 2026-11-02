@@ -519,7 +519,7 @@ def cmd_site_serve(args) -> int:
 
 def _inside_git_repo_root(path: Path) -> Path | None:
     try:
-        out = subprocess.run(["git", "-C", str(path), "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+        out = subprocess.run(["git", "-C", str(path), "rev-parse", "--show-toplevel"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     except OSError:
         return None
     return Path(out.stdout.strip()) if out.returncode == 0 else None
@@ -546,7 +546,7 @@ def cmd_doctor(args) -> int:
             is_kit = (top / "skills" / "kinship-kit" / "kin").is_dir()
             check(not is_kit, f"Git-репозиторий дела: {top}",
                   "Дело внутри публичного репозитория набора — перенесите папку дела!" if is_kit else "")
-            remote = subprocess.run(["git", "-C", str(top), "remote", "-v"], capture_output=True, text=True).stdout
+            remote = subprocess.run(["git", "-C", str(top), "remote", "-v"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
             if "github.com" in remote or "gitlab.com" in remote:
                 check(True, "У репозитория дела есть внешний remote — убедитесь, что он ПРИВАТНЫЙ",
                       remote.splitlines()[0] if remote else "")

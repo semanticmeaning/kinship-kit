@@ -85,7 +85,7 @@ class TestExchange(unittest.TestCase):
         dst = Path(self.tmp.name) / "restored"
         run("restore", str(arch), str(dst))
         self.assertEqual(Case(dst).rows("claims"), Case(self.src).rows("claims"))
-        log = subprocess.run(["git", "-C", str(dst), "log", "--oneline"], capture_output=True, text=True).stdout
+        log = subprocess.run(["git", "-C", str(dst), "log", "--oneline"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
         self.assertIn("demo", log)
         self.assertNotEqual(run("restore", str(arch), str(dst), ok=False).returncode, 0)  # не в непустую папку
         # подмена файла внутри архива

@@ -314,16 +314,16 @@ class TestSetup(unittest.TestCase):
             case = Path(tmp) / "cases" / "vetluginy"
             res = subprocess.run([sys.executable, str(KIN), "setup", "--yes", "--surname", "Ветлугин",
                                   "--title", "Род Ветлугиных", "--dir", str(case), "--anonymous-author"],
-                                 capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL)
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, stdin=subprocess.DEVNULL)
             self.assertEqual(res.returncode, 0, res.stderr)
             cfg = json.loads((case / "case.json").read_text(encoding="utf-8"))
             self.assertEqual(cfg["lines"][0]["id"], "vetlugin")
-            name = subprocess.run(["git", "-C", str(case), "config", "user.name"], capture_output=True, text=True).stdout
+            name = subprocess.run(["git", "-C", str(case), "config", "user.name"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
             self.assertEqual(name.strip(), "Исследователь")
             self.assertIn("Ветлугин", (Path(tmp) / "deny.txt").read_text(encoding="utf-8"))
             self.assertTrue((case / ".claude" / "agents" / "kin-orchestrator.md").is_file())
             self.assertTrue((case / ".codex" / "agents" / "kin-orchestrator.toml").is_file())
-            log = subprocess.run(["git", "-C", str(case), "log", "--format=%an"], capture_output=True, text=True).stdout
+            log = subprocess.run(["git", "-C", str(case), "log", "--format=%an"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
             self.assertEqual(log.strip(), "Исследователь")
 
     def test_setup_refuses_non_empty_dir(self):
@@ -333,7 +333,7 @@ class TestSetup(unittest.TestCase):
             d.mkdir()
             (d / "mine.txt").write_text("личное", encoding="utf-8")
             res = subprocess.run([sys.executable, str(KIN), "setup", "--yes", "--surname", "Ветлугин", "--dir", str(d),
-                                  "--anonymous-author"], capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL)
+                                  "--anonymous-author"], capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, stdin=subprocess.DEVNULL)
             self.assertNotEqual(res.returncode, 0)
             self.assertFalse((d / ".git").exists())
 
@@ -341,7 +341,7 @@ class TestSetup(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env = {**os.environ, "HOME": tmp, "KIN_DENYLIST": str(Path(tmp) / "deny.txt")}
             res = subprocess.run([sys.executable, str(KIN), "setup", "--yes", "--surname", "Ветлугин",
-                                  "--dir", str(Path(tmp) / "c")], capture_output=True, text=True, env=env,
+                                  "--dir", str(Path(tmp) / "c")], capture_output=True, text=True, encoding="utf-8", errors="replace", env=env,
                                  stdin=subprocess.DEVNULL)
             self.assertNotEqual(res.returncode, 0)
             self.assertIn("автора", res.stderr)

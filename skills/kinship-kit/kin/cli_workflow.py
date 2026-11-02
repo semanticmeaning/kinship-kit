@@ -76,7 +76,7 @@ def _ask(prompt: str, default: str = "", required: bool = True) -> str:
 
 def _git_global(key: str) -> str:
     try:
-        return subprocess.run(["git", "config", "--global", key], capture_output=True, text=True).stdout.strip()
+        return subprocess.run(["git", "config", "--global", key], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
     except OSError:
         return ""
 

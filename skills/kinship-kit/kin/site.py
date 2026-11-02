@@ -199,7 +199,7 @@ def check_layout(out: Path, page: Path | None = None) -> list[str]:
         return ["примечание: node не найден — раскладка сайта не проверена (kin работает и без него)"]
     try:
         res = subprocess.run([node, str(WEB / "check_layout.js"), str(page or WEB / "index.html"), str(out / "tree.json")],
-                             capture_output=True, text=True, timeout=300)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
     except (OSError, subprocess.TimeoutExpired) as e:
         return [f"предупреждение: проверка раскладки не выполнилась — {e}"]
     return [] if res.returncode == 0 else [line for line in res.stdout.splitlines() if line.strip()]

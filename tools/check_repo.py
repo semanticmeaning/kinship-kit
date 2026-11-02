@@ -29,7 +29,7 @@ SKIP = {"tools/check_repo.py"}  # содержит сами шаблоны
 def files(staged: bool) -> list[str]:
     cmd = ["git", "-C", str(ROOT), "diff", "--cached", "--name-only", "--diff-filter=ACMR"] if staged else \
           ["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard"]
-    out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+    out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout
     return [f for f in out.splitlines() if f]
 
 

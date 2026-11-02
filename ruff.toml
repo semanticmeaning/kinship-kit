@@ -4,9 +4,11 @@ line-length = 160
 extend-exclude = [".venv", "work", "_site"]
 
 [lint]
+preview = true
+explicit-preview-rules = true   # из предварительных правил — только явно названные
 # E/W — стиль и ошибки pycodestyle, F — pyflakes (неиспользуемое, неопределённое), B — типичные ошибки (bugbear),
 # UP — устаревший синтаксис для py310, SIM — упрощения, PLE — ошибки pylint
-select = ["E", "W", "F", "I", "B", "UP", "SIM", "PLE"]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "PLE", "PLW1514"]  # PLW1514: файл без явной кодировки (Windows)
 ignore = [
   "E731",   # lambda в переменной — принято в коротких помощниках
   "SIM108", # тернарный оператор вместо if/else — не всегда читаемее

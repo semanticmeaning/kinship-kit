@@ -45,7 +45,7 @@ class TestBuild(unittest.TestCase):
             if NODE:
                 with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
                     f.write(snippet)
-                res = subprocess.run([NODE, "--check", f.name], capture_output=True, text=True)
+                res = subprocess.run([NODE, "--check", f.name], capture_output=True, text=True, encoding="utf-8", errors="replace")
                 Path(f.name).unlink()
                 self.assertEqual(res.returncode, 0, res.stderr)
         with self.assertRaises(KinError):
@@ -90,7 +90,7 @@ class TestCoreInBrowser(Base):
             out = Path(self.tmp.name) / "download"
             res = subprocess.run([NODE, str(REPO / "tests" / "browser" / "run_downloader.mjs"), CHROME,
                                   f"http://127.0.0.1:{srv.server_address[1]}/unit", str(sp), str(out), str(cdp)],
-                                 capture_output=True, text=True, timeout=300)
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
             self.assertEqual(res.returncode, 0, res.stderr)
             result = json.loads(res.stdout.strip().splitlines()[-1])
         finally:

@@ -52,7 +52,7 @@ class TestFindMcpFeedbackLang(Base):
             self.assertTrue(res["isError"] and "Недоступно" in res["content"][0]["text"], args)
         # через настоящий stdio
         proc = subprocess.run([sys.executable, str(KIN), "mcp", "serve", "--case", str(self.case)],
-                              input='{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n', capture_output=True, text=True)
+                              input='{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n', capture_output=True, text=True, encoding="utf-8", errors="replace")
         self.assertIn("kin_status", proc.stdout)
         self.assertIn("mcp_servers.kinship-kit", self.kin("mcp", "config", "--client", "codex").stdout)
 
@@ -224,6 +224,24 @@ class TestTranslations(unittest.TestCase):
         self.assertGreater(len(labels), 50)
         missing = sorted({f"{where}: {text!r}" for text, where in labels if text not in PHRASES})
         self.assertEqual(missing, [], "нет перевода в kin/i18n.py → PHRASES")
+
+
+class TestWindowsEncoding(unittest.TestCase):
+    def test_text_subprocess_output_has_explicit_encoding(self):
+        """В Windows текстовый вывод программ читается в кодировке системы (cp1252/cp1251), а kin, git и node пишут UTF-8:
+        без encoding= чтение падает в фоновом потоке и вывод молча становится None."""
+        import ast
+        bad = []
+        roots = [REPO / "skills" / "kinship-kit", REPO / "examples", REPO / "tools", REPO / "tests"]
+        for f in sorted(p for r in roots for p in r.rglob("*.py")):
+            for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in ("run", "check_output", "Popen") \
+                        and getattr(n.func.value, "id", "") == "subprocess":
+                    kws = {k.arg: k.value for k in n.keywords}
+                    textual = any(isinstance(kws.get(k), ast.Constant) and kws[k].value is True for k in ("text", "universal_newlines"))
+                    if textual and "encoding" not in kws:
+                        bad.append(f"{f.relative_to(REPO)}:{n.lineno}")
+        self.assertEqual(bad, [], "добавьте encoding=\"utf-8\", errors=\"replace\"")
 
 
 class TestPython310Compat(unittest.TestCase):

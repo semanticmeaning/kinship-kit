@@ -6,6 +6,7 @@ import re
 import sys
 from pathlib import Path
 
+sys.stdout.reconfigure(encoding="utf-8")  # Windows: консоль не в UTF-8
 text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
 blocks = re.split(r"^={50,}\n", text, flags=re.M)[1:]
 items = []
