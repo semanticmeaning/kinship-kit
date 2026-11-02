@@ -11,6 +11,7 @@ import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from helpers import REPO, Base, run  # noqa: E402
@@ -343,29 +344,50 @@ class TestLockAndRollback(Base):
             os.utime(lock, (t, t))
         return lock
 
-    @unittest.skipIf(os.name == "nt", "проверка процесса — только POSIX")
     def test_dead_owner_lock_is_taken_at_once(self):
         dead = subprocess.Popen([sys.executable, "-c", "pass"])
         dead.wait()
-        self._lock_file(f"{dead.pid} 2026-01-01T00:00:00 {socket.gethostname()}")
+        self._lock_file(f"{dead.pid} 2026-01-01T00:00:00 {socket.gethostname()} t0")
         with Case(self.case).lock(timeout=0.5):
             pass
 
-    @unittest.skipIf(os.name == "nt", "проверка процесса — только POSIX")
     def test_live_owner_keeps_old_lock(self):
-        lock = self._lock_file(f"{os.getpid()} 2026-01-01T00:00:00 {socket.gethostname()}", age=3600)
+        """В том числе в Windows: проверка процесса через OpenProcess, а не по возрасту файла."""
+        lock = self._lock_file(f"{os.getpid()} 2026-01-01T00:00:00 {socket.gethostname()} t0", age=3600)
         with self.assertRaises(KinError) as err, Case(self.case).lock(timeout=0.3):
             pass
         self.assertIn(str(os.getpid()), str(err.exception))
         self.assertTrue(lock.exists())
 
-    def test_unknown_owner_falls_back_to_age(self):
-        self._lock_file("12345 2026-01-01T00:00:00 another-host", age=3600)
-        with Case(self.case).lock(timeout=0.5):
+    def test_unverifiable_or_foreign_owner_is_never_taken_by_age(self):
+        from kin import store
+        self._lock_file(f"{os.getpid()} 2026-01-01T00:00:00 {socket.gethostname()} t0", age=3600)
+        with mock.patch.object(store, "_pid_alive", return_value=None), self.assertRaises(KinError), \
+                Case(self.case).lock(timeout=0.3):
             pass
-        self._lock_file("12345 2026-01-01T00:00:00 another-host")
+        self._lock_file("12345 2026-01-01T00:00:00 another-host t0", age=3600)
+        with self.assertRaises(KinError) as err, Case(self.case).lock(timeout=0.3):
+            pass
+        self.assertIn("another-host", str(err.exception))
+
+    def test_ownerless_lock_falls_back_to_age(self):
+        for content in ("", "12345 2026-01-01T00:00:00"):  # пустой после сбоя; формат до 0.5.0
+            self._lock_file(content, age=3600)
+            with Case(self.case).lock(timeout=0.5):
+                pass
+        self._lock_file("")
         with self.assertRaises(KinError), Case(self.case).lock(timeout=0.3):
             pass
+
+    def test_release_keeps_someone_elses_lock(self):
+        lock = self.case / ".kin" / "write.lock"
+        with Case(self.case).lock():
+            lock.write_text(f"{os.getpid()} 2026-01-01T00:00:00 {socket.gethostname()} other", encoding="utf-8")
+        self.assertTrue(lock.exists(), "чужая блокировка удалена при выходе")
+        lock.unlink()
+        with Case(self.case).lock():
+            pass
+        self.assertFalse(lock.exists())
 
     def test_rollback_restores_files_without_temp_leftovers(self):
         case = Case(self.case)

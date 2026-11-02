@@ -127,9 +127,13 @@ class TestServiceRegressions(Base):
         inbox.mkdir()
         (inbox / "скан.txt").write_text("скан", encoding="utf-8")
         link = inbox / "ссылка.txt"
-        link.symlink_to(secret)
-        for args in (["source", "add", str(secret), "--title", "x"], ["source", "add", str(link), "--title", "x"],
-                     ["source", "import-download", self.tmp.name]):
+        cases = [["source", "add", str(secret), "--title", "x"], ["source", "import-download", self.tmp.name]]
+        try:
+            link.symlink_to(secret)
+            cases.append(["source", "add", str(link), "--title", "x"])
+        except OSError:  # Windows без права на символические ссылки (WinError 1314) — эту часть не проверить
+            pass
+        for args in cases:
             self.assertIn("KIN_MCP_INBOX", srv._blocked(args), args)
         self.assertEqual(srv._blocked(["source", "add", str(inbox / "скан.txt"), "--title", "x"]), "")
         self.assertEqual(srv._blocked(["source", "add", "--url", "https://example.org/x", "--title", "x"]), "")

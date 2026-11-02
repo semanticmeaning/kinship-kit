@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import socket
 import time
 from pathlib import Path
@@ -96,7 +97,7 @@ def find_case_dir(start: str | os.PathLike | None = None) -> Path:
     raise KinError("Папка дела не найдена: укажите --case DIR, переменную KIN_CASE или перейдите в папку дела.")
 
 
-LOCK_STALE_SECONDS = 600
+LOCK_STALE_SECONDS = 600  # только для блокировок без владельца (пустой файл после сбоя, формат до 0.5.0)
 
 
 def _read_text(path: Path) -> str:
@@ -106,10 +107,37 @@ def _read_text(path: Path) -> str:
         return ""
 
 
-def _pid_alive(pid: int) -> bool | None:
-    """Жив ли процесс; None — проверить нельзя (Windows: os.kill там завершает процесс, а не проверяет)."""
-    if os.name == "nt" or pid <= 0:
+def _pid_alive_windows(pid: int) -> bool | None:
+    """Windows: OpenProcess + GetExitCodeProcess (os.kill там завершает процесс, а не проверяет)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        k32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        handle = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            err = ctypes.get_last_error()
+            return {87: False, 5: True}.get(err)  # нет такого процесса / есть, но чужой; иное — неизвестно
+        try:
+            code = wintypes.DWORD()
+            if not k32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return None
+            return code.value == 259  # STILL_ACTIVE
+        finally:
+            k32.CloseHandle(handle)
+    except (OSError, AttributeError, ImportError, ValueError):
         return None
+
+
+def _pid_alive(pid: int) -> bool | None:
+    """Жив ли процесс на этой машине; None — проверить не удалось."""
+    if pid <= 0:
+        return None
+    if os.name == "nt":
+        return _pid_alive_windows(pid)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -121,15 +149,31 @@ def _pid_alive(pid: int) -> bool | None:
     return True
 
 
-def _lock_abandoned(lock: Path) -> bool:
-    """Блокировка брошена: процесс-владелец на этой машине завершился. Живой долгий процесс (большой импорт)
-    блокировку не теряет. Если проверить процесс нельзя (другая машина, Windows, файл ещё пишется) — по возрасту файла."""
-    parts = _read_text(lock).split(" ")
-    if len(parts) >= 3 and parts[0].isdigit() and parts[2] == socket.gethostname():
-        alive = _pid_alive(int(parts[0]))
-        if alive is not None:
-            return not alive
+def _lock_abandoned(content: str, lock: Path) -> bool:
+    """Блокировка брошена, только если её процесс-владелец на этой машине точно завершился.
+    Живой процесс (долгий импорт) блокировку не теряет; процесс другой машины или непроверяемый — тоже
+    (снять вручную, удалив файл). По возрасту — только блокировка без владельца: пустой файл после сбоя или формат до 0.5.0."""
+    parts = content.split(" ")
+    if len(parts) >= 3 and parts[0].isdigit():
+        if parts[2] != socket.gethostname():
+            return False
+        return _pid_alive(int(parts[0])) is False
     return time.time() - lock.stat().st_mtime > LOCK_STALE_SECONDS
+
+
+def _unlink_retry(path: Path, attempts: int = 300) -> None:
+    """Удалить файл; в Windows файл, открытый другим процессом на чтение, удаляется не сразу — повторять."""
+    for _ in range(attempts):
+        try:
+            path.unlink()
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if os.name != "nt":
+                raise
+            time.sleep(0.01)
+    path.unlink(missing_ok=True)
 
 
 class Case:
@@ -240,27 +284,40 @@ class Case:
         lock_dir = self.root / ".kin"
         lock_dir.mkdir(exist_ok=True)
         lock = lock_dir / "write.lock"
+        mine = f"{os.getpid()} {now_iso()} {socket.gethostname()} {secrets.token_hex(6)}"
         deadline = time.monotonic() + timeout
         while True:
             try:
                 fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                os.write(fd, f"{os.getpid()} {now_iso()} {socket.gethostname()}".encode())
+                os.write(fd, mine.encode())
                 os.close(fd)
                 break
             except FileExistsError:
-                try:
-                    if _lock_abandoned(lock):
-                        # переименование атомарно: снять чужую брошенную блокировку сможет только один процесс
-                        os.rename(lock, lock_dir / f"write.lock.stale-{os.getpid()}")
-                        (lock_dir / f"write.lock.stale-{os.getpid()}").unlink()
-                        continue
-                except FileNotFoundError:
+                pass
+            except PermissionError:  # Windows: прежний файл блокировки ещё удаляется — занято
+                if os.name != "nt":
+                    raise
+            try:
+                content = _read_text(lock)
+                if _lock_abandoned(content, lock):
+                    # переименование атомарно: брошенную блокировку снимает только один процесс
+                    stale = lock_dir / f"write.lock.stale-{os.getpid()}"
+                    os.replace(lock, stale)
+                    if _read_text(stale) != content:  # успели поставить новую, живую — вернуть на место
+                        with contextlib.suppress(OSError):
+                            os.link(stale, lock)
+                    _unlink_retry(stale)
                     continue
-                if time.monotonic() > deadline:
-                    owner = _read_text(lock).split(" ")[0] or "?"
-                    raise KinError(f"Дело занято другой записью ({lock}, процесс {owner}). "
-                                   "Если процесс завис — завершите его или удалите файл.") from None
-                time.sleep(0.1)
+            except FileNotFoundError:
+                continue
+            except PermissionError:  # Windows: файл в этот момент занят другим процессом
+                if os.name != "nt":
+                    raise
+            if time.monotonic() > deadline:
+                parts = (_read_text(lock).split(" ") + ["?", "", "?"])[:3]
+                raise KinError(f"Дело занято другой записью ({lock}, процесс {parts[0]} на {parts[2]}). "
+                               "Если этот процесс завершён или завис — завершите его или удалите файл.") from None
+            time.sleep(0.1)
         self._lock_depth = 1
         try:
             self._cache.clear()  # перечитать актуальное под блокировкой
@@ -268,8 +325,8 @@ class Case:
             yield
         finally:
             self._lock_depth = 0
-            with contextlib.suppress(FileNotFoundError):
-                lock.unlink()
+            if _read_text(lock) == mine:  # удалять только свою блокировку
+                _unlink_retry(lock)
 
     @contextlib.contextmanager
     def transaction(self):
