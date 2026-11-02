@@ -16,6 +16,41 @@ from . import edtf, publish
 from .store import Case, KinError
 
 WEB = Path(__file__).resolve().parent / "web"
+THEME_DIR = "theme"
+CSS_STUB = """/* Личное оформление сайта этого дела. Подключается поверх общего шаблона kinship-kit.
+   Пример: другие цвета (переменные — в начале skills/kinship-kit/kin/web/index.html).
+:root { --accent: #2f6b8a; --bg: #f3f6f8; }
+*/
+"""
+
+
+def theme_init(case: Case, full: bool) -> list[Path]:
+    """Создать theme/custom.css (и с full — копию страницы theme/index.html) в папке дела."""
+    theme = case.root / THEME_DIR
+    theme.mkdir(exist_ok=True)
+    made = []
+    css = theme / "custom.css"
+    if not css.exists():
+        css.write_text(CSS_STUB, encoding="utf-8")
+        made.append(css)
+    if full:
+        page = theme / "index.html"
+        if page.exists():
+            raise KinError(f"{page} уже есть — правьте его (kin site theme diff — отличия от общего шаблона)")
+        shutil.copy(WEB / "index.html", page)
+        made.append(page)
+    return made
+
+
+def theme_diff(case: Case) -> str:
+    """Отличия страницы дела от общего шаблона — чтобы перенести удачные правки в набор."""
+    import difflib
+    page = case.root / THEME_DIR / "index.html"
+    if not page.is_file():
+        return "Своей страницы нет (только custom.css или общий шаблон)."
+    a = (WEB / "index.html").read_text(encoding="utf-8").splitlines(keepends=True)
+    b = page.read_text(encoding="utf-8").splitlines(keepends=True)
+    return "".join(difflib.unified_diff(a, b, "kinship-kit/kin/web/index.html", f"{THEME_DIR}/index.html")) or "Отличий нет."
 GEN_STEP = 27  # средний шаг поколения, лет — только для людей без связей с корнем
 
 
@@ -97,7 +132,13 @@ def build(case: Case, profile: str = "private") -> Path:
         p["gen"] = gen[p["id"]]
     out.mkdir(parents=True)
     (out / "tree.json").write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    shutil.copy(WEB / "index.html", out / "index.html")
+    theme = case.root / THEME_DIR
+    page = theme / "index.html" if (theme / "index.html").is_file() else WEB / "index.html"
+    html = page.read_text(encoding="utf-8")
+    if (theme / "custom.css").is_file():  # личное оформление дела поверх общего шаблона
+        shutil.copy(theme / "custom.css", out / "custom.css")
+        html = html.replace("</head>", '<link rel="stylesheet" href="custom.css">\n</head>', 1)
+    (out / "index.html").write_text(html, encoding="utf-8")
     if profile == "public":
         (out / "robots.txt").write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
     else:

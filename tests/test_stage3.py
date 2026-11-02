@@ -358,3 +358,48 @@ class TestGedcomAtomic(Base):
         self.assertEqual(list((self.case / "sources").glob("A-*")), [])
         rep = gedcom.import_file(Case(self.case), ged)  # повтор после сбоя проходит
         self.assertEqual((rep["persons_new"], rep["relationships"]), (2, 1))
+
+
+class TestPublicationChoices(Base):
+    def setUp(self):
+        super().setUp()
+        a = self.add_source("svid", group="g1")
+        self.grand = self.person("Ветлугин Сергей Петрович", "deceased", "identity-confirmed", "--birth", "1921")
+        self.user = self.person("Ветлугина Анна Сергеевна", "living", "identity-confirmed", "--birth", "1952")
+        self.kin("claim", "add", "--type", "other", "--subject", self.grand, "--status", "hypothesis",
+                 "--statement", "Со слов внучки Анны Сергеевны")
+
+    def test_default_fails_redact_masks(self):
+        self.assertNotEqual(self.kin("site", "build", "--profile", "public", ok=False).returncode, 0)
+        self.kin("case", "set", "privacy.on_leak=redact")
+        self.kin("site", "build", "--profile", "public")
+        tree = (self.case / "site" / "public" / "tree.json").read_text(encoding="utf-8")
+        self.assertIn("Со слов внучки [скрыто]", tree)
+        self.assertNotIn("Анн", tree)
+        self.assertNotEqual(self.kin("case", "set", "privacy.on_leak=maybe", ok=False).returncode, 0)
+
+    def test_public_living_needs_human_decision(self):
+        self.assertIn("--by", self.kin("case", "set", "privacy.public_living=allow", ok=False).stderr)
+        self.kin("case", "set", "privacy.public_living=allow", "--by", "Автор Дела")
+        self.kin("site", "build", "--profile", "public")
+        tree = json.loads((self.case / "site" / "public" / "tree.json").read_text(encoding="utf-8"))
+        self.assertIn(self.user, {p["id"] for p in tree["persons"]})
+        self.assertIn("human-decision", (self.case / "journal.jsonl").read_text(encoding="utf-8"))
+        self.kin("update", self.user, "publication=deny")  # личный запрет сильнее общего решения
+        self.kin("site", "build", "--profile", "public", ok=False)  # теперь её имя в тексте — снова утечка
+
+    def test_case_theme(self):
+        self.kin("site", "theme", "init")
+        (self.case / "theme" / "custom.css").write_text(":root{--accent:#123456}", encoding="utf-8")
+        self.kin("update", "C-0001", "statement=Нейтральный текст")
+        self.kin("site", "build")
+        out = self.case / "site" / "private"
+        self.assertIn('href="custom.css"', (out / "index.html").read_text(encoding="utf-8"))
+        self.assertTrue((out / "custom.css").is_file())
+        self.kin("site", "theme", "init", "--full")
+        page = self.case / "theme" / "index.html"
+        page.write_text(page.read_text(encoding="utf-8").replace("<title>Схема рода</title>", "<title>Наш род</title>"),
+                        encoding="utf-8")
+        self.assertIn("+<title>Наш род</title>", self.kin("site", "theme", "diff").stdout)
+        self.kin("site", "build")
+        self.assertIn("Наш род", (out / "index.html").read_text(encoding="utf-8"))

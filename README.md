@@ -6,6 +6,10 @@
 
 English: [README.en.md](README.en.md)
 
+**Демо:** https://semanticmeaning.github.io/kinship-kit/ — сайт-схема вымышленной семьи (публичная и приватная версии, RU/EN).
+
+![Сайт-схема рода: колена, гипотезы, профиль с источниками и конкурирующими версиями](docs/img/demo-ru.png)
+
 ## Установка
 
 ```bash
@@ -58,6 +62,7 @@ python3 examples/demo/build_demo.py ~/kinship-cases/demo && kin --case ~/kinship
 | Архитектура хранения | `docs/ARCHITECTURE.md`, решения — `docs/adr/` |
 | Независимое ревью | `docs/REVIEW.md` |
 | Выкладка сайта (Caddy, GitHub Pages), форма «сведения семьи» | `docs/deploy.md` |
+| Как переносить улучшения из своего исследования в набор | `docs/CONTRIBUTING.md` |
 | Экспорт, резервная копия, восстановление | `docs/EXPORT.md` |
 | GEDCOM: что переносится | `docs/GEDCOM.md` |
 | MCP-сервер (Claude Desktop, Codex …) | `docs/MCP.md` |

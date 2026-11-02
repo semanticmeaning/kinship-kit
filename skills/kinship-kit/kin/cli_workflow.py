@@ -614,7 +614,24 @@ def add_commands(sub, common) -> None:
     p.set_defaults(fn=cmd_hooks_install)
 
 
+def cmd_site_theme(args) -> int:
+    case = _case(args)
+    if args.action == "init":
+        made = site.theme_init(case, args.full)
+        print("\n".join(f"✓ {p.relative_to(case.root)}" for p in made) or "Тема уже есть")
+        print("Пересобрать: kin site build. Удачные правки страницы — kin site theme diff → перенести в набор.")
+    else:
+        print(site.theme_diff(case))
+    return 0
+
+
 def add_site_publish(site_sub, common) -> None:
+    p = site_sub.add_parser("theme", help="Личное оформление сайта дела: init [--full] | diff")
+    p.add_argument("action", choices=["init", "diff"])
+    p.add_argument("--full", action="store_true", help="Копия всей страницы, а не только custom.css")
+    common(p)
+    p.set_defaults(fn=cmd_site_theme)
+
     p = site_sub.add_parser("publish", help="Собрать с проверками и скопировать в папку веб-сервера")
     p.add_argument("--profile", default="public", choices=["private", "public"])
     p.add_argument("--to")

@@ -381,7 +381,17 @@ def _bool(value: str) -> bool:
 
 
 _bool.__name__ = "true/false"
+def _choice(*allowed):
+    def conv(value: str) -> str:
+        if value not in allowed:
+            raise ValueError(value)
+        return value
+    conv.__name__ = "|".join(allowed)
+    return conv
+
+
 CASE_KEYS = {"title": str, "language": str, "root_person": str, "privacy.living_cutoff_years": int,
+             "privacy.public_living": _choice("hide", "allow"), "privacy.on_leak": _choice("fail", "redact"),
              "feedback.enabled": _bool, "feedback.max_per_day": int, "feedback.max_chars": int,
              "feedback.per_ip_per_hour": int}
 LINE_FIELDS = ("id", "title", "surname", "state", "where", "focus", "color")
@@ -402,6 +412,12 @@ def cmd_case_set(args) -> int:
                 typed = CASE_KEYS[key](value)
             except ValueError:
                 raise KinError(f"{key}: ожидается {CASE_KEYS[key].__name__}") from None
+            if key == "privacy.public_living" and typed == "allow":
+                by = " ".join((args.by or "").split())
+                if by.casefold() in ("", "user"):
+                    raise KinError("Показ живых в публичной версии — решение автора дела: --by «Имя». "
+                                   "Публикация данных живых людей требует их согласия (в РФ — 152-ФЗ).")
+                case.journal(by, "human-decision", "case.json", {"action": "public-living-allow"})
             target, leaf = case.config, key
             if "." in key:
                 head, leaf = key.split(".", 1)
@@ -654,6 +670,7 @@ def build_parser() -> argparse.ArgumentParser:
     g = sub.add_parser("case", help="Настройки дела (case.json)").add_subparsers(dest="sub", required=True)
     p = g.add_parser("set", help="kin case set root_person=P-0001 title=…")
     p.add_argument("pairs", nargs="+")
+    p.add_argument("--by", help="Кто принимает решение (обязательно для privacy.public_living=allow)")
     _common(p)
     p.set_defaults(fn=cmd_case_set)
     p = g.add_parser("line", help="Линии поиска: kin case line add vetluginy title=… color=#b5651d")

@@ -63,7 +63,7 @@ def main() -> int:
             problems.append(f"{rel}: демо-документ без пометки [СИНТЕТИЧЕСКИЙ ДОКУМЕНТ]")
         text = "\n".join(line for line in text.splitlines() if ALLOW not in line)
         for m in EMAIL.finditer(text):
-            if not EMAIL_OK.search(m.group(0)):
+            if not EMAIL_OK.search(m.group(0)) and m.group(0) != "git@github.com":  # SSH-адрес, не почта
                 problems.append(f"{rel}: e-mail {m.group(0)}")
         for rx, label in [(PHONE, "телефон"), (PRIVATE_PATH, "приватный путь")] + [(s, "секрет") for s in SECRETS]:
             m = rx.search(text)

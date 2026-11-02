@@ -37,8 +37,9 @@ def latest_birth_year(value: str) -> int | None:
     return d["end"]["year"]
 
 
-def person_visible(p: dict, profile: str, cutoff_years: int, this_year: int | None = None) -> tuple[bool, str]:
-    """(видно ли, причина). При сомнении — скрыть."""
+def person_visible(p: dict, profile: str, cutoff_years: int, this_year: int | None = None,
+                   public_living: str = "hide") -> tuple[bool, str]:
+    """(видно ли, причина). При сомнении — скрыть. public_living=allow — решение автора дела показывать живых."""
     this_year = this_year or dt.date.today().year
     if p["status"] == "duplicate":
         return False, "дубликат"
@@ -48,6 +49,8 @@ def person_visible(p: dict, profile: str, cutoff_years: int, this_year: int | No
         return True, ""
     if p.get("publication") == "allow":
         return True, "publication=allow"
+    if public_living == "allow":
+        return True, "privacy.public_living=allow"
     if p["living_status"] == "living":
         return False, "живой"
     if p["living_status"] == "deceased":
@@ -68,11 +71,12 @@ def build(case: Case, profile: str) -> dict:
     except (TypeError, ValueError):
         raise KinError("case.json: privacy.living_cutoff_years должно быть целым числом") from None
     lang = case.config.get("language", "ru")
+    public_living = case.config.get("privacy", {}).get("public_living", "hide")
     public = profile == "public"
     persons_all = case.index("persons")
     visible, hidden = {}, {}
     for pid, p in persons_all.items():
-        ok, why = person_visible(p, profile, cutoff)
+        ok, why = person_visible(p, profile, cutoff, public_living=public_living)
         (visible if ok else hidden)[pid] = why
 
     def vis(pid: str) -> bool:
@@ -247,11 +251,68 @@ def check_leaks(paths: list[Path], terms: list[str]) -> list[str]:
     return problems
 
 
+def redact_text(text: str, terms: list[str], mark: str = "[скрыто]") -> tuple[str, int]:
+    """Заменить в тексте скрытые сведения (имена в любом падеже, ID, e-mail, телефоны) на mark.
+    Совпадения ищутся по нормализованному тексту и переносятся на исходные слова."""
+    count = 0
+    text, n = EMAIL_RE.subn(mark, text)
+    count += n
+    text, n = PHONE_RE.subn(mark, text)
+    count += n
+    compiled = [re.compile(t) for t in terms]
+    for _ in range(50):  # каждое совпадение — одна замена; ограничение на всякий случай
+        words = list(re.finditer(r"\w+", text))
+        folded, spans = [], []
+        pos = 0
+        for w in words:
+            f = w.group(0).casefold().replace("ё", "е")
+            spans.append((pos, pos + len(f), w.start(), w.end()))
+            folded.append(f)
+            pos += len(f) + 1
+        joined = " ".join(folded)
+        hit = None
+        for rx in compiled:
+            m = rx.search(joined)
+            if m:
+                hit = m
+                break
+        if not hit:
+            break
+        covered = [s for s in spans if s[1] > hit.start() and s[0] < hit.end()]
+        if not covered:
+            break
+        text = text[:covered[0][2]] + mark + text[covered[-1][3]:]
+        count += 1
+    return text, count
+
+
+def _redact_data(data, terms: list[str]) -> int:
+    total = 0
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if isinstance(v, str) and k not in ("id", "type", "status", "kind", "profile", "language", "built_at"):
+                data[k], n = redact_text(v, terms)
+                total += n
+            else:
+                total += _redact_data(v, terms)
+    elif isinstance(data, list):
+        for i, v in enumerate(data):
+            if isinstance(v, str):
+                data[i], n = redact_text(v, terms)
+                total += n
+            else:
+                total += _redact_data(v, terms)
+    return total
+
+
 def write(case: Case, profile: str) -> tuple[Path, dict, list[str]]:
     out = case.root / "publish" / profile
     path = out / "data.json"
     path.unlink(missing_ok=True)  # старый набор не должен пережить неудачную сборку
     data, hidden = build(case, profile)
+    if case.config.get("privacy", {}).get("on_leak") == "redact":  # решение автора: закрывать, а не падать
+        data["meta"]["redacted"] = _redact_data({k: v for k, v in data.items() if k != "meta"},
+                                                forbidden_terms(case, hidden))
     out.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     problems = check_leaks([path], forbidden_terms(case, hidden))

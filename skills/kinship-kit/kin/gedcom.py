@@ -275,6 +275,8 @@ def export(case: Case, profile: str = "private", include_hypotheses: bool = Fals
     problems = []
     if profile == "public":  # проверяем и сам файл, и склеенные значения (CONC/CONT режут слова)
         terms = publish.forbidden_terms(case, hidden)
+        if case.config.get("privacy", {}).get("on_leak") == "redact":
+            text = "\n".join(publish.redact_text(line, terms)[0] if " " in line else line for line in text.split("\n"))
 
         def values(nodes):
             for n in nodes:
