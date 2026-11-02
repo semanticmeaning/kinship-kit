@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import sys
 import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_kin import KIN, REPO, Base, run  # noqa: E402
@@ -340,6 +342,21 @@ class TestStage3ReviewFixes(Base):
                      ["site", "build"], ["upgrade", "check"], ["downloader", "list"]):
             self.assertEqual(srv._blocked(args), "", args)
         self.assertTrue(srv._blocked(["status"], case=other))  # параметр case инструмента тоже не уводит в чужое дело
+        # файлы источников — только из папки дела или KIN_MCP_INBOX (иначе агент заберёт в дело любой файл машины)
+        secret = Path(self.tmp.name) / "id_rsa"
+        secret.write_text("ключ", encoding="utf-8")
+        inbox = self.case / "inbox"
+        inbox.mkdir()
+        (inbox / "скан.txt").write_text("скан", encoding="utf-8")
+        link = inbox / "ссылка.txt"
+        link.symlink_to(secret)
+        for args in (["source", "add", str(secret), "--title", "x"], ["source", "add", str(link), "--title", "x"],
+                     ["source", "import-download", self.tmp.name]):
+            self.assertIn("KIN_MCP_INBOX", srv._blocked(args), args)
+        self.assertEqual(srv._blocked(["source", "add", str(inbox / "скан.txt"), "--title", "x"]), "")
+        self.assertEqual(srv._blocked(["source", "add", "--url", "https://example.org/x", "--title", "x"]), "")
+        with mock.patch.dict(os.environ, {"KIN_MCP_INBOX": self.tmp.name}):
+            self.assertEqual(srv._blocked(["source", "add", str(secret), "--title", "x"]), "")
         res = srv.call("kin_status", {"case": other})
         self.assertTrue(res[1] and "Недоступно" in res[0])
 

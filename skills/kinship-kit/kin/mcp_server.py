@@ -28,6 +28,9 @@ ALLOWED: dict[str, set[str] | None] = {
 }
 # ключи, которые указывают путь вне дела: запрещены даже у разрешённых команд
 PATH_FLAGS = {"out": "--out", "to": "--to", "target": "--target", "publish_to": "--publish-to", "dir": "--dir"}
+# файлы для source add / import-download — только из папки дела и папок KIN_MCP_INBOX (через os.pathsep):
+# иначе агент мог бы забрать в дело любой файл машины (ключи, пароли) и вместе с делом отправить его в git
+INBOX_ENV = "KIN_MCP_INBOX"
 TERMINAL_ONLY = "команда пишет вне папки дела или запускает службу — её выполняет человек в терминале"
 INSTRUCTIONS = ("kinship-kit: дело генеалогического исследования. Начинайте с kin_status и kin_next. "
                 "Изменения — инструментом kin (args — как в командной строке, например "
@@ -63,6 +66,11 @@ TOOLS = [
 
 def _same_path(a: str, b: str) -> bool:
     return Path(a).expanduser().resolve() == Path(b).expanduser().resolve()
+
+
+def _inside(path: str, root: str) -> bool:
+    """Путь (после раскрытия ссылок) лежит внутри root."""
+    return Path(path).expanduser().resolve().is_relative_to(Path(root).expanduser().resolve())
 
 
 class Server:
@@ -111,6 +119,13 @@ class Server:
             other = getattr(ns, dest, None)
             if other and fixed and not _same_path(other, fixed):
                 return f"--case {other}: сервер работает с делом {fixed}"
+        src = (getattr(ns, "file", None) or getattr(ns, "folder", None)) if cmd == "source" else None
+        if src:
+            roots = [r for r in os.environ.get(INBOX_ENV, "").split(os.pathsep) if r.strip()]
+            roots += [fixed or getattr(ns, "case", None) or getattr(ns, "case_global", None) or ""]
+            if not any(r and _inside(src, r) for r in roots):
+                return (f"{src}: через MCP файлы берутся только из папки дела или папок {INBOX_ENV} — "
+                        "положите скан туда или добавьте источник в терминале")
         return ""
 
     def call(self, name: str, a: dict) -> tuple[str, bool]:

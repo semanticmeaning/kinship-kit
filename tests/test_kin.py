@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import json
+import os
+import socket
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -374,6 +377,62 @@ class TestPrivacyEdgeCases(Base):
             return r.status
         self.assertEqual(get(f"127.0.0.1:{port}"), 200)
         self.assertEqual(get(f"evil.example:{port}"), 421)
+
+
+class TestLockAndRollback(Base):
+    def _lock_file(self, content: str, age: float = 0) -> Path:
+        lock = self.case / ".kin" / "write.lock"
+        lock.parent.mkdir(exist_ok=True)
+        lock.write_text(content, encoding="utf-8")
+        if age:
+            t = time.time() - age
+            os.utime(lock, (t, t))
+        return lock
+
+    @unittest.skipIf(os.name == "nt", "проверка процесса — только POSIX")
+    def test_dead_owner_lock_is_taken_at_once(self):
+        dead = subprocess.Popen([sys.executable, "-c", "pass"])
+        dead.wait()
+        self._lock_file(f"{dead.pid} 2026-01-01T00:00:00 {socket.gethostname()}")
+        with Case(self.case).lock(timeout=0.5):
+            pass
+
+    @unittest.skipIf(os.name == "nt", "проверка процесса — только POSIX")
+    def test_live_owner_keeps_old_lock(self):
+        lock = self._lock_file(f"{os.getpid()} 2026-01-01T00:00:00 {socket.gethostname()}", age=3600)
+        with self.assertRaises(KinError) as err, Case(self.case).lock(timeout=0.3):
+            pass
+        self.assertIn(str(os.getpid()), str(err.exception))
+        self.assertTrue(lock.exists())
+
+    def test_unknown_owner_falls_back_to_age(self):
+        self._lock_file("12345 2026-01-01T00:00:00 another-host", age=3600)
+        with Case(self.case).lock(timeout=0.5):
+            pass
+        self._lock_file("12345 2026-01-01T00:00:00 another-host")
+        with self.assertRaises(KinError), Case(self.case).lock(timeout=0.3):
+            pass
+
+    def test_rollback_restores_files_without_temp_leftovers(self):
+        case = Case(self.case)
+        persons = case.path("persons")
+        before = persons.read_bytes()
+        with self.assertRaises(RuntimeError), case.transaction():
+            persons.write_text("испорчено", encoding="utf-8")
+            raise RuntimeError("сбой посреди операции")
+        self.assertEqual(persons.read_bytes(), before)
+        self.assertEqual(list(self.case.rglob("*.rollback.tmp")), [])
+
+
+class TestDoctor(Base):
+    def test_merge_conflict_in_registry_is_reported(self):
+        self.person("Иван Тестов")
+        self.assertIn("✓ Реестры без следов конфликта", self.kin("doctor", ok=False).stdout)
+        with open(self.case / "registry" / "persons.csv", "a", encoding="utf-8") as fh:
+            fh.write("<<<<<<< HEAD\nP-0002,x\n=======\nP-0002,y\n>>>>>>> other\n")
+        res = self.kin("doctor", ok=False)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("Конфликт в persons.csv", res.stdout)
 
 
 class TestDemo(unittest.TestCase):

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from . import __version__, audit, cli_stage3, cli_workflow, i18n, publish, site, status, workflow
 from .i18n import t
-from .store import REGISTERS, SCHEMA, Case, KinError, field_names, find_case_dir, init_case, register_by_prefix, sha256_file, split_ids
+from .store import REGISTERS, REGISTRY_DIR, SCHEMA, Case, KinError, field_names, find_case_dir, init_case, register_by_prefix, sha256_file, split_ids
 
 # ---------------------------------------------------------------- помощники
 
@@ -550,6 +550,16 @@ def cmd_doctor(args) -> int:
             if "github.com" in remote or "gitlab.com" in remote:
                 check(True, "У репозитория дела есть внешний remote — убедитесь, что он ПРИВАТНЫЙ",
                       remote.splitlines()[0] if remote else "")
+            if remote:
+                check(True, "Дело синхронизируется через git: пишет один клон за раз",
+                      "ID выдаются по порядку (P-0012…): перед работой git pull, после — коммит и git push. "
+                      "Две машины, пишущие одновременно, получат одинаковые ID и конфликт в CSV")
+        # следы неразрешённого слияния git в реестрах: конфликт ID нужно разобрать вручную
+        conflicted = [f.name for f in sorted((case.root / REGISTRY_DIR).glob("*.csv"))
+                      if any(line.startswith(("<<<<<<< ", ">>>>>>> ")) for line in f.read_text(encoding="utf-8").splitlines())]
+        check(not conflicted, "Реестры без следов конфликта слияния git",
+              ("Конфликт в " + ", ".join(conflicted) + ": оставьте одну версию строк, повторившимся ID дайте новые "
+               "(kin add/update), затем kin audit") if conflicted else "")
         res = audit.run(case)
         check(not res["errors"], f"Аудит: ошибок {len(res['errors'])}, предупреждений {len(res['warnings'])}",
               "kin audit" if res["errors"] else "")

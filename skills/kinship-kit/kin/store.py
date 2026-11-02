@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import socket
 import time
 from pathlib import Path
 
@@ -93,6 +94,42 @@ def find_case_dir(start: str | os.PathLike | None = None) -> Path:
             except (OSError, ValueError):
                 pass
     raise KinError("Папка дела не найдена: укажите --case DIR, переменную KIN_CASE или перейдите в папку дела.")
+
+
+LOCK_STALE_SECONDS = 600
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return ""
+
+
+def _pid_alive(pid: int) -> bool | None:
+    """Жив ли процесс; None — проверить нельзя (Windows: os.kill там завершает процесс, а не проверяет)."""
+    if os.name == "nt" or pid <= 0:
+        return None
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # процесс есть, просто чужой
+    except OSError:
+        return None
+    return True
+
+
+def _lock_abandoned(lock: Path) -> bool:
+    """Блокировка брошена: процесс-владелец на этой машине завершился. Живой долгий процесс (большой импорт)
+    блокировку не теряет. Если проверить процесс нельзя (другая машина, Windows, файл ещё пишется) — по возрасту файла."""
+    parts = _read_text(lock).split(" ")
+    if len(parts) >= 3 and parts[0].isdigit() and parts[2] == socket.gethostname():
+        alive = _pid_alive(int(parts[0]))
+        if alive is not None:
+            return not alive
+    return time.time() - lock.stat().st_mtime > LOCK_STALE_SECONDS
 
 
 class Case:
@@ -207,12 +244,12 @@ class Case:
         while True:
             try:
                 fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                os.write(fd, f"{os.getpid()} {now_iso()}".encode())
+                os.write(fd, f"{os.getpid()} {now_iso()} {socket.gethostname()}".encode())
                 os.close(fd)
                 break
             except FileExistsError:
                 try:
-                    if time.time() - lock.stat().st_mtime > 600:  # брошенная блокировка
+                    if _lock_abandoned(lock):
                         # переименование атомарно: снять чужую брошенную блокировку сможет только один процесс
                         os.rename(lock, lock_dir / f"write.lock.stale-{os.getpid()}")
                         (lock_dir / f"write.lock.stale-{os.getpid()}").unlink()
@@ -220,7 +257,9 @@ class Case:
                 except FileNotFoundError:
                     continue
                 if time.monotonic() > deadline:
-                    raise KinError(f"Дело занято другой записью ({lock}). Если процесс завис — удалите файл.") from None
+                    owner = _read_text(lock).split(" ")[0] or "?"
+                    raise KinError(f"Дело занято другой записью ({lock}, процесс {owner}). "
+                                   "Если процесс завис — завершите его или удалите файл.") from None
                 time.sleep(0.1)
         self._lock_depth = 1
         try:
@@ -244,8 +283,10 @@ class Case:
                 for f, data in snapshot.items():
                     if data is None:
                         f.unlink(missing_ok=True)
-                    else:
-                        f.write_bytes(data)
+                    else:  # через временный файл: сбой посреди отката не оставит реестр полузаписанным
+                        tmp = f.with_name(f.name + ".rollback.tmp")
+                        tmp.write_bytes(data)
+                        os.replace(tmp, f)
                 self._cache.clear()
                 self.config = json.loads((self.root / CASE_FILE).read_text(encoding="utf-8"))
                 raise
