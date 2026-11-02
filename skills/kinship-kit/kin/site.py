@@ -181,11 +181,16 @@ def build(case: Case, profile: str = "private") -> Path:
         raise KinError("Сайт не собран — утечки в сборке:\n- " + "\n- ".join(problems))
     for line in check_layout(out):  # раскладка на этих данных: пустые координаты, наложения, ошибки скрипта
         print(line, file=sys.stderr)
+    if (theme / "index.html").is_file():
+        print("примечание: своя страница дела (theme/index.html) не проверяется автоматически — раскладка проверена "
+              "по общему шаблону; смотрите сайт глазами", file=sys.stderr)
     return out
 
 
-def check_layout(out: Path) -> list[str]:
+def check_layout(out: Path, page: Path | None = None) -> list[str]:
     """Прогнать код страницы на собранных данных (node): обычный вид, фильтры семей, раскрытия родни.
+    Выполняется ТОЛЬКО страница из набора (page — для тестов набора): скрипт страницы в node работает с правами
+    пользователя, а theme/index.html приходит вместе с делом и может быть чужим. Из дела берутся только данные tree.json.
     Возвращает строки «предупреждение: …»; пустой список — всё в порядке или node нет (тогда — одна строка-пояснение)."""
     import shutil as _sh
     import subprocess
@@ -193,7 +198,7 @@ def check_layout(out: Path) -> list[str]:
     if not node:
         return ["примечание: node не найден — раскладка сайта не проверена (kin работает и без него)"]
     try:
-        res = subprocess.run([node, str(WEB / "check_layout.js"), str(out / "index.html"), str(out / "tree.json")],
+        res = subprocess.run([node, str(WEB / "check_layout.js"), str(page or WEB / "index.html"), str(out / "tree.json")],
                              capture_output=True, text=True, timeout=300)
     except (OSError, subprocess.TimeoutExpired) as e:
         return [f"предупреждение: проверка раскладки не выполнилась — {e}"]

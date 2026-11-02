@@ -195,6 +195,28 @@ class TestLayoutCheck(Base):
                               str(out / "tree.json")], capture_output=True, text=True)
         self.assertEqual(res.returncode, 0, res.stdout)
 
+    def test_theme_page_script_is_not_run_in_node(self):
+        """Проверка раскладки выполняет в node только страницу набора: theme/index.html приходит с делом и может быть чужим."""
+        import shutil as sh
+        if not sh.which("node"):
+            self.skipTest("нужен node")
+        sys.path.insert(0, str(REPO / "skills" / "kinship-kit"))
+        from kin import site as site_mod
+        self.person("Ветлугин Сергей")
+        marker = Path(self.tmp.name) / "marker.txt"
+        probe = ("(process.getBuiltinModule ? process.getBuiltinModule('fs') : process.mainModule.require('fs'))"
+                 f".writeFileSync({json.dumps(str(marker))}, 'x');")
+        theme = self.case / "theme"
+        theme.mkdir()
+        page = (site_mod.WEB / "index.html").read_text(encoding="utf-8").replace("<script>", "<script>" + probe, 1)
+        (theme / "index.html").write_text(page, encoding="utf-8")
+        res = self.kin("site", "build")
+        self.assertFalse(marker.exists(), "скрипт страницы дела выполнился в node")
+        self.assertIn("theme/index.html", res.stderr)
+        # зонд рабочий: выполненная напрямую, такая страница создала бы файл
+        site_mod.check_layout(self.case / "site" / "private", page=theme / "index.html")
+        self.assertTrue(marker.exists())
+
     def test_demo_layout(self):
         import shutil as sh
         if not sh.which("node"):
