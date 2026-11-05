@@ -4,7 +4,7 @@ description: Генеалогическое исследование (бывши
 license: MIT (основано на ex-ussr-kinship-research © 2026 Denis Shiryaev)
 compatibility: Python 3.10+ (только стандартная библиотека), shell. Claude Code, Codex и другие клиенты с поддержкой Agent Skills.
 metadata:
-  version: "0.5.2"
+  version: "0.6.0"
   language: "ru"
   reply_language: "user"
 ---
@@ -113,6 +113,11 @@ python3 <папка этого навыка>/kin.py <команда>      # да
 3. Каждый просмотренный ресурс — `kin search add --task T-…` (и при находке, и без неё); находку — `source add` + `mention`.
    Повтор безрезультатного поиска `kin` отклонит без `--new-basis`.
 4. Обновить утверждения, связи и гипотезу (источники «за» и «против», противоречия); решение по гипотезе — `kin hypothesis status … --reason`.
+   **Соперничающие версии закрывать в том же коммите, что и находку.** Перед коммитом — `kin find <ID человека>` (утверждения и пометки о тех же людях):
+   опровергнутое источником — `kin update C-… status=contradicted` или `rejected` (источник — в `contradicting_artifact_ids`, в `rationale` — «Пересмотрено <дата>: …»);
+   подтверждённое — повысить статус; кандидат оказался другим человеком — `kin update P-… status=unlikely`; подтвердилось тождество — `kin person merge`.
+   Отсутствие записи само по себе версию не опровергает (правило об отрицательных поисках): такую версию ослабить, а не закрыть. Решения из шага 6 — через ревью.
+   В отчёте пользователю — строка «Закрыто гипотез: N».
 5. Завершить задачу: `kin task done T-… --reason … --evidence A-…` или `kin task close T-… --reason …`; новую — `kin task new …`.
 6. Значимый вывод (принять/опровергнуть гипотезу, strongly-corroborated, слияние) — `kin review request <ID> --for <решение>`; проверяет
    **другая роль** (Evidence Reviewer) по первичным источникам; правила — `docs/REVIEW.md` репозитория набора.

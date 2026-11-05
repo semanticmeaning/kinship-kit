@@ -65,6 +65,10 @@ Sign changes with the role: `--as "Archive Researcher"` (or `KIN_ACTOR`). Never 
    A repeated empty search is refused without `--new-basis`.
 9. Do not close a hypothesis after one task; `rejected` needs contradicting sources and reopen conditions.
 10. Do not invent missing facts; family memory stays `family-reported` until documents confirm it.
+11. Close competing versions in the same commit as the finding. Before committing, run `kin find <person ID>`: a claim refuted by a source becomes
+    `contradicted` or `rejected` (source in `contradicting_artifact_ids`, “Revised <date>: …” in `rationale`); a confirmed one is raised; a candidate who
+    proved to be someone else becomes `unlikely`; a confirmed identity goes to `kin person merge`. Absence of a record alone does not refute a version:
+    weaken it instead. Decisions that need review still go through review. Report the line “Hypotheses closed: N”.
 
 ## Independent review
 
