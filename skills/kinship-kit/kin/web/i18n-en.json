@@ -240,14 +240,6 @@
 "<h4>Other</h4>"
 ],
 [
-"`<h3>Показ</h3>",
-"`<h3>Display</h3>"
-],
-[
-"> Показать отброшенное</label>",
-"> Show rejected</label>"
-],
-[
 "`<h3>Отброшено</h3>`",
 "`<h3>Rejected</h3>`"
 ],
@@ -302,14 +294,6 @@
 [
 "sec('Сведения', `<dl",
 "sec('Details', `<dl"
-],
-[
-"sec('Факты и их подтверждение',",
-"sec('Facts and their evidence',"
-],
-[
-"sec('Связи', rels)",
-"sec('Relationships', rels)"
 ],
 [
 "sec('Заметки исследования',",
@@ -486,5 +470,57 @@
 [
 "esc(info.name)",
 "esc(info.name_en || info.name)"
+],
+[
+"title=\"Что показывать: клик — следующий вариант\"><span id=\"modetxt\">Гипотезы поиска</span>",
+"title=\"What to show: click for the next option\"><span id=\"modetxt\">Search hypotheses</span>"
+],
+[
+"const MODES = [['conf', 'Только подтверждённые'], ['hyp', 'Гипотезы поиска'], ['rej', 'Показать отброшенное']];",
+"const MODES = [['conf', 'Confirmed only'], ['hyp', 'Search hypotheses'], ['rej', 'Show rejected']];"
+],
+[
+"`Показ: ${name}. Нажмите, чтобы переключить`",
+"`Display: ${name}. Click to switch`"
+],
+[
+"c.lv === 'rejected' ? 'опровергнуто' : 'не найдено'",
+"c.lv === 'rejected' ? 'refuted' : 'not found'"
+],
+[
+"`<div class=\"subhead\">Связи</div>`",
+"`<div class=\"subhead\">Relationships</div>`"
+],
+[
+"'<span class=\"lv lv-off\">опровергнуто</span>'",
+"'<span class=\"lv lv-off\">refuted</span>'"
+],
+[
+"'В режиме «Только подтверждённые» опровергнутое не показывается'",
+"'Refuted items are not shown in the “Confirmed only” mode'"
+],
+[
+"'Скрыть опровергнутое и не найденное'",
+"'Hide refuted and not found'"
+],
+[
+"'Показать опровергнутое и не найденное'",
+"'Show refuted and not found'"
+],
+[
+"sec('Факты',",
+"sec('Facts',"
+],
+[
+"sec('Связи',",
+"sec('Relationships',"
+],
+[
+"sec('Гипотезы',",
+"sec('Hypotheses',"
+],
+[
+"sec('Опровергнуто и не найдено',",
+"sec('Refuted and not found',"
 ]
 ]

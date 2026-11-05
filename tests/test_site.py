@@ -169,7 +169,7 @@ class TestSiteLanguages(Base):
                                   page.as_uri() + "#P-0002"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120).stdout
             dom = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", dom, flags=re.S)
             text = htmllib.unescape(re.sub(r"<[^>]+>", " ", dom)) + " " + " ".join(re.findall(r'(?:title|aria-label|placeholder)="([^"]*)"', dom))
-            self.assertIn("Facts and their evidence", text)  # профиль отрисован
+            self.assertIn("Facts", text)  # профиль отрисован
             russian = sorted({x.strip() for x in re.findall(r"[А-Яа-яЁё][А-Яа-яЁё ]*", text)} - {"Русская версия"})
             self.assertEqual(russian, [])
             unlock(case)
@@ -220,6 +220,68 @@ class TestLayoutCheck(Base):
             # зонд рабочий: выполненная напрямую, такая страница создала бы файл
             site_mod.check_layout(self.case / "site" / "private", page=theme / "index.html")
         self.assertTrue(marker.exists())
+
+    def test_display_modes_nest_and_confirmed_hides_candidates(self):
+        """«Только подтверждённые» ⊂ «Гипотезы поиска» ⊂ «Показать отброшенное»; кандидаты и гипотезы — не в первом режиме."""
+        import shutil as sh
+        if not sh.which("node"):
+            self.skipTest("нужен node")
+        real = self.person("Ветлугин Сергей", "deceased", "identity-confirmed", "--birth", "1921")
+        hyp = self.person("Ветлугин Кандидат", "deceased", "hypothesis", "--birth", "1890")
+        cand = self.person("Ветлугин Возможный", "deceased", "candidate", "--birth", "1891")
+        off = self.person("Ветлугин Отброшенный", "deceased", "unlikely", "--birth", "1892")
+        self.kin("case", "set", f"root_person={real}")
+        self.kin("site", "build")
+        web = REPO / "skills" / "kinship-kit" / "kin" / "web"
+        res = subprocess.run(["node", str(web / "check_layout.js"), str(web / "index.html"), str(self.case / "site" / "private" / "tree.json"), "--modes"],
+                             capture_output=True, text=True, encoding="utf-8", errors="replace")
+        self.assertEqual(res.returncode, 0, res.stdout)
+        modes = {k: set(v) for k, v in json.loads(res.stdout.splitlines()[-1]).items()}
+        self.assertIn(real, modes["conf"])
+        self.assertFalse({hyp, cand, off} & modes["conf"])
+        self.assertLessEqual(modes["conf"], modes["hyp"])
+        self.assertLessEqual(modes["hyp"], modes["rej"])
+        self.assertNotIn(off, modes["hyp"])
+        self.assertIn(off, modes["rej"])
+
+    def test_saved_page_leaves_gallery_only_when_source_has_link(self):
+        """Копия страницы без внешней ссылки — единственный способ увидеть источник: из галереи не убирается."""
+        import re
+        import shutil as sh
+        if not sh.which("node"):
+            self.skipTest("нужен node")
+        page = (REPO / "skills" / "kinship-kit" / "kin" / "web" / "index.html").read_text(encoding="utf-8")
+        code = "\n".join(re.search(rf"^const {name} = .*$", page, flags=re.M).group(0) for name in ("SAVED_PAGE", "viewable"))
+        probe = code + """
+const D = { arts: { 'A-1': { urls: ['https://example.org/x'] }, 'A-2': { urls: [] }, 'A-3': { urls: ['https://example.org/y'] } } };
+console.log(JSON.stringify(viewable([{ a: 'A-1', f: ['p.html.txt'] }, { a: 'A-2', f: ['p.htm.txt'] }, { a: 'A-3', f: ['s.jpg', 'note.txt', 'p.xhtml.txt'] }])));"""
+        res = subprocess.run(["node", "-e", probe], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(json.loads(res.stdout), [{"a": "A-2", "f": ["p.htm.txt"]}, {"a": "A-3", "f": ["s.jpg", "note.txt"]}])
+
+    def test_card_splits_facts_hypotheses_and_hides_refuted(self):
+        import re
+        import shutil as sh
+        chrome = next((p for p in (sh.which("google-chrome"), "/opt/google/chrome/chrome") if p and Path(p).exists()), None)
+        if not chrome:
+            self.skipTest("нужен Chrome")
+        a1, a2 = self.add_source("svid", group="g1"), self.add_source("spravka", group="g2")
+        p = self.person("Ветлугин Сергей", "deceased", "identity-confirmed", "--birth", "1921")
+        self.kin("claim", "add", "--type", "birth", "--subject", p, "--statement", "Родился в Кленовке", "--sources", a1, "--status", "single-source")
+        self.kin("claim", "add", "--type", "residence", "--subject", p, "--statement", "Возможно, жил в Заречье", "--status", "hypothesis")
+        self.kin("claim", "add", "--type", "residence", "--subject", p, "--statement", "Жил в Озерках", "--sources", a2, "--status", "rejected", "--rationale", "другой человек")
+        self.kin("site", "build")
+        dom = subprocess.run([chrome, "--headless=new", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=5000",
+                              f"--user-data-dir={self.tmp.name}/chrome", "--allow-file-access-from-files", "--dump-dom",
+                              (self.case / "site" / "private" / "index.ru.html").as_uri() + f"#{p}"],
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120).stdout
+        sections = re.findall(r'<summary[^>]*>([^<]+)</summary>', dom)
+        self.assertIn("Факты", sections)
+        self.assertIn("Гипотезы", sections)
+        self.assertNotIn("Опровергнуто и не найдено", sections)  # по умолчанию скрыто — открывается глазом
+        self.assertIn('id="eyetog"', dom)
+        self.assertIn('id="modetog"', dom)
+        self.assertNotIn("Жил в Озерках", re.sub(r"<script.*?</script>", "", dom, flags=re.S))
 
     def test_demo_layout(self):
         import shutil as sh
