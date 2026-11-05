@@ -96,6 +96,8 @@ button { cursor: pointer; }
 .btn:hover { background: var(--band); }
 .btn.on { border-color: var(--hyp); color: var(--hyp); }
 #famtog { display: inline-flex; align-items: center; gap: 7px; }
+#modetog { display: inline-flex; align-items: center; gap: 7px; }
+.modei { width: .95em; height: .95em; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .famx { display: none; width: .72em; height: .72em; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
 #famtog.on .famx { display: block; }
 #fams { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
@@ -208,6 +210,15 @@ details.sec > summary:hover { color: var(--ink); }
 .th { width: 64px; height: 64px; border: 2px solid transparent; border-radius: 4px; padding: 0; background: #fff center / cover no-repeat; opacity: .7; color: #1d2733; font-size: 11px; font-weight: 700; }
 .th.on { border-color: #f7a8cd; opacity: 1; }
 .lv { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 0 6px; border-radius: 8px; margin-right: 6px; border: 1px solid currentColor; }
+.lv-off { color: var(--muted); }
+.phead { display: flex; align-items: flex-start; gap: 10px; }
+.phead h2 { flex: 1; }
+.eye { flex: none; width: 32px; height: 32px; margin-top: 2px; padding: 5px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.eye:hover:not(:disabled) { background: var(--band); color: var(--ink); }
+.eye.open { color: var(--ink); border-color: var(--edge-fam); }
+.eye:disabled { opacity: .4; cursor: default; }
+.eye svg { width: 100%; height: 100%; display: block; }
+.subhead { margin: 10px 0 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
 .lv-doc2, .lv-doc1 { color: var(--ok); } .lv-family { color: var(--muted); } .lv-hyp, .lv-research, .lv-open { color: var(--hyp); } .lv-rejected { color: var(--rej); }
 .src { font-size: 12.5px; color: var(--soft); padding: 5px 0; border-top: 1px solid var(--rule); }
 .src b { color: var(--ink); font-weight: 700; }
@@ -256,6 +267,7 @@ details.sec > summary:hover { color: var(--ink); }
   <div id="qwrap"><input id="q" type="search" placeholder="Поиск: люди и утверждения" autocomplete="off" aria-label="Поиск по людям и утверждениям"><div id="qres" hidden></div></div>
   <button class="btn sq" id="zin" title="Крупнее" aria-label="Крупнее">+</button>
   <button class="btn sq" id="zout" title="Мельче" aria-label="Мельче">−</button>
+  <button class="btn" id="modetog" title="Что показывать: клик — следующий вариант"><span id="modetxt">Гипотезы поиска</span><svg class="modei" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
   <button class="btn" id="famtog" aria-pressed="false" title="Раскрасить карточки по семьям">По семьям<svg class="famx" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
   <button class="btn" id="langtog" title="English version">EN</button>
   <div id="fams" hidden></div>
@@ -314,7 +326,7 @@ const CAND_NAME = { 'tree-entry-unverified': 'запись семейного д
 const LIV_NAME = { living: 'жив(а)', deceased: 'умер(ла)', 'probably-deceased': 'вероятно, умер(ла)', 'possibly-living': 'возможно, жив(а)', unknown: 'неизвестно' };
 const T_NAME = { parent: 'родитель', spouse: 'супруг(а)', sibling: 'брат/сестра', cousin: 'двоюродные', kinship: 'родство', identity: 'одно лицо?' };
 
-const S = { expanded: new Set(), forced: new Set(), all: false, showRej: false, sel: null, view: { x: 0, y: 0, k: 1 }, pos: new Map(), tab: 'search' };
+const S = { expanded: new Set(), forced: new Set(), all: false, showRej: false, mode: 'hyp', sel: null, view: { x: 0, y: 0, k: 1 }, pos: new Map(), tab: 'search' };
 let D, P, E, nb, CL, LN, minGen, maxGen;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -357,16 +369,24 @@ function renderVersion() {
 
 /* ---------- кто виден ---------- */
 const other = (e, id) => e.a === id ? e.b : e.a;
-function edgeShown(e) { return e.lv !== 'rejected' || S.showRej; }
+// режим показа (кнопка в меню, по кругу): только подтверждённые → гипотезы поиска → с отброшенным
+const MODES = [['conf', 'Только подтверждённые'], ['hyp', 'Гипотезы поиска'], ['rej', 'Показать отброшенное']];
+const CONFIRMED = new Set(['tree-entry-unverified', 'family-reported', 'identity-probable', 'identity-confirmed']);  // дерево семьи, со слов семьи, личность по документам
+const CONF_LV = new Set(['doc2', 'doc1', 'family']);
+function allowed(p) { return S.mode === 'conf' ? CONFIRMED.has(p.cand) : p.cand !== 'unlikely' || S.showRej; }
+function claimShown(c) { return S.mode === 'conf' ? CONF_LV.has(c.lv) : true; }
+function edgeShown(e) { return S.mode === 'conf' ? CONF_LV.has(e.lv) : e.lv !== 'rejected' || S.showRej; }
 function baseVisibleCore(p) { return p.direct || CAND.has(p.cand); }
 function baseVisible(p) {
-  if (S.all) return p.cand !== 'unlikely' || S.showRej;
+  if (!allowed(p)) return false;
+  if (S.mode === 'conf') return p.direct || S.forced.has(p.id) || S.all;
+  if (S.all) return true;
   if (p.cand === 'unlikely') return S.showRej;
   return p.direct || CAND.has(p.cand) || S.forced.has(p.id);
 }
 function computeVisible() {
   const vis = new Set(D.persons.filter(baseVisible).map(p => p.id));
-  for (const id of [...vis]) for (const e of nb.get(id)) if (e.lv === 'research' || e.t === 'identity') { if (edgeShown(e)) vis.add(other(e, id)); }
+  for (const id of [...vis]) for (const e of nb.get(id)) if (e.lv === 'research' || e.t === 'identity') { if (edgeShown(e) && allowed(P.get(other(e, id)))) vis.add(other(e, id)); }
   let grew = true;
   while (grew) {
     grew = false;
@@ -375,7 +395,7 @@ function computeVisible() {
       for (const e of nb.get(id)) {
         if (!STRUCT.has(e.t) || !edgeShown(e)) continue;
         const o = other(e, id);
-        if (!vis.has(o) && (P.get(o).cand !== 'unlikely' || S.showRej)) { vis.add(o); grew = true; }
+        if (!vis.has(o) && allowed(P.get(o))) { vis.add(o); grew = true; }
       }
     }
   }
@@ -398,10 +418,19 @@ function applyFamFilter(f) {
   if (!f) return;
   const before = new Set(S.forced);
   for (const p of D.persons) {
-    if (p.fam !== f || VIS.has(p.id) || (p.cand === 'unlikely' && !S.showRej)) continue;
+    if (p.fam !== f || VIS.has(p.id) || !allowed(p)) continue;
     revealPath(p.id); VIS = computeVisible();
   }
   S.famAdded = new Set([...S.forced].filter(id => !before.has(id)));
+}
+function setMode(m) {
+  S.mode = m; S.showRej = m === 'rej';
+  const name = MODES.find(x => x[0] === m)[1];
+  $('modetxt').textContent = name; $('modetog').setAttribute('aria-label', `Показ: ${name}. Нажмите, чтобы переключить`);
+  for (const id of [...S.forced]) if (!allowed(P.get(id))) S.forced.delete(id);
+  if (S.famFilter) applyFamFilter(S.famFilter);
+  renderFams(); renderPanel();
+  relayout(S.sel && allowed(P.get(S.sel)) && S.pos.has(S.sel) ? S.sel : D.meta.root);
 }
 // при перестройке под семью экран держится за её карточку (выбранную или первую видимую)
 function famAnchor(f) {
@@ -410,12 +439,12 @@ function famAnchor(f) {
 }
 function renderFams() {
   $('fams').hidden = !S.famMode;
-  $('fams').innerHTML = (D.families || []).map(f => `<button class="famchip${S.famFilter === f.key ? ' on' : S.famFilter ? ' off' : ''}" data-fam="${esc(f.key)}" style="--fc:${esc(f.color)}" title="${S.famFilter === f.key ? 'Показать все семьи' : 'Оставить цветной только эту семью'}"><i></i>${esc(f.name)} <small>${f.count}</small></button>`).join('');
+  $('fams').innerHTML = (D.families || []).map(f => ({ ...f, count: D.persons.filter(p => p.fam === f.key && allowed(p)).length })).map(f => `<button class="famchip${S.famFilter === f.key ? ' on' : S.famFilter ? ' off' : ''}" data-fam="${esc(f.key)}" style="--fc:${esc(f.color)}" title="${S.famFilter === f.key ? 'Показать все семьи' : 'Оставить цветной только эту семью'}"><i></i>${esc(f.name)} <small>${f.count}</small></button>`).join('');
 }
 function refreshCards() { buildCards(); place(1, S.pos); }
 function hiddenCount(id, vis) {
   const s = new Set();
-  for (const e of nb.get(id)) if (STRUCT.has(e.t) && edgeShown(e) && !vis.has(other(e, id))) s.add(other(e, id));
+  for (const e of nb.get(id)) if (STRUCT.has(e.t) && edgeShown(e) && !vis.has(other(e, id)) && allowed(P.get(other(e, id)))) s.add(other(e, id));
   return s.size;
 }
 
@@ -798,12 +827,10 @@ function drawEdges(cur, withChips) {
     if (f.r - f.l > 1) out.push(`<path class="e-${main} ${pc(ids)}" d="M${f.l},${busY} H${f.r}"/>`);
     for (const [kid, es] of f.kids) {
       const c = cur.get(kid), cx = c.x + CW / 2;
-      const lvs = [...new Set(es.map(e => e.lv))];
-      lvs.forEach((lv, i) => {
-        const dx = lvs.length > 1 ? (i ? 3 : -3) : 0;
-        out.push(`<path class="e-${lv} ${pc([...f.ps, kid])}" d="M${cx + dx},${busY} V${c.y}"/>`);
-      });
-      for (const e of es) if (e.lv === 'research' || e.lv === 'rejected') chips.push([e, cx, c.y - 8]);
+      // у родителей разный уровень подтверждения — к ребёнку одна линия по самому сильному (документ важнее семейных сведений, те — гипотезы)
+      const lv = es.map(e => e.lv).sort((a, b) => LV_ORDER.indexOf(a) - LV_ORDER.indexOf(b))[0];
+      out.push(`<path class="e-${lv} ${pc([...f.ps, kid])}" d="M${cx},${busY} V${c.y}"/>`);
+      for (const e of es) if (e.lv === lv && (lv === 'research' || lv === 'rejected')) chips.push([e, cx, c.y - 8]);
     }
   }
   // родитель и ребёнок не в соседних строках (разные поколения в браке): дуга со стрелкой поверх карточек
@@ -909,7 +936,7 @@ function revealPath(id) {
     for (const e of nb.get(x)) {
       if (!STRUCT.has(e.t) || !edgeShown(e)) continue;
       const o = other(e, x);
-      if (prev.has(o)) continue;
+      if (prev.has(o) || !allowed(P.get(o))) continue;
       prev.set(o, x);
       if (VIS.has(o)) { hit = o; break; }
       q.push(o);
@@ -918,6 +945,7 @@ function revealPath(id) {
   for (let x = hit ? prev.get(hit) : id; x; x = prev.get(x)) S.forced.add(x);
 }
 function focusPerson(id, sel = true) {
+  if (!allowed(P.get(id))) { if (sel) select(id); return; }  // в этом режиме человек не показывается — только карточка в панели
   if (!VIS.has(id)) { revealPath(id); relayout(null, false); }
   const p = LAY.pos.get(id); if (!p) return;
   const a = area(); S.view.k = Math.max(S.view.k, 0.85);
@@ -947,7 +975,7 @@ function renderPanel() {
   $('pbody').scrollTop = 0;
 }
 function searchHTML() {
-  const open = D.claims.filter(c => c.lv === 'hyp' || c.lv === 'open');
+  const open = S.mode === 'conf' ? [] : D.claims.filter(c => c.lv === 'hyp' || c.lv === 'open');
   const out = [];
   for (const l of D.lines) {
     const hs = open.filter(c => c.line === l.id);
@@ -955,12 +983,10 @@ function searchHTML() {
       <span class="state${/ждём/.test(l.state) ? ' wait' : ''}">${esc(l.state)}</span>
       <div class="sub">${esc(l.where)}</div>
       <div style="margin:6px 0">${l.focus.map(plink).join(', ')}</div>
-      ${hs.map(hypHTML).join('') || '<div class="sub">Открытых гипотез нет.</div>'}</section>`);
+      ${hs.map(hypHTML).join('') || (S.mode === 'conf' ? '' : '<div class="sub">Открытых гипотез нет.</div>')}</section>`);
   }
   const restH = open.filter(c => !c.line);
   if (restH.length) out.push(`<section class="line" style="--lc:var(--rule)"><h4>Прочее</h4>${restH.map(hypHTML).join('')}</section>`);
-  out.push(`<h3>Показ</h3>
-    <label class="chk"><input type="checkbox" id="c-rej" ${S.showRej ? 'checked' : ''}> Показать отброшенное</label>`);
   if (S.showRej) {
     const rej = D.claims.filter(c => c.lv === 'rejected');
     out.push(`<h3>Отброшено</h3>` + rej.map(c => `<button class="hyp" data-go="${c.subj[0] || ''}"><span class="ht">${esc(c.text)}</span>
@@ -973,8 +999,13 @@ const ICON_DOC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON_EXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>';
 // значки ячейки: документы (галерея) и внешние ссылки; ключ — id утверждения или связи
 const DOCREF = new Map();
+// сохранённая копия страницы сайта (в сборке — .html.txt) в галерею не идёт, если у источника есть значок внешней ссылки;
+// без ссылки остаётся единственным способом увидеть источник — показывается как текст
+const SAVED_PAGE = /\.[xs]?html?\.txt$/i;
+const viewable = docs => (docs || []).map(d => ({ a: d.a, f: d.f.filter(f => !(SAVED_PAGE.test(f) && D.arts[d.a]?.urls?.length)) })).filter(d => d.f.length);
 function docIcons(key, title, docs, arts) {
-  const files = (docs || []).reduce((n, d) => n + d.f.length, 0);
+  docs = viewable(docs);
+  const files = docs.reduce((n, d) => n + d.f.length, 0);
   const urls = [...new Set((arts || []).flatMap(a => (D.arts[a]?.urls || []).map(u => a + '\t' + u)))].map(x => x.split('\t'));
   DOCREF.set(key, { title, docs: docs || [], urls });
   return (files ? `<button class="ic" data-doc="${esc(key)}" title="Документы: ${files}" aria-label="Документы: ${files}">${ICON_DOC}${files > 1 ? `<span class="n">${files}</span>` : ''}</button>` : '') +
@@ -985,6 +1016,8 @@ function cellHTML(key, title, docs, arts, body, extra = '', tag = 'div') {
   if (!extra && /^C-\d{4}$/.test(key)) extra = ` id="cl-${key}"`;
   return `<${tag} class="cell${ic ? ' has-icons' : ''}"${extra}>${ic ? `<div class="ficons">${ic}</div>` : ''}${body}</${tag}>`;
 }
+const ICON_EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.1 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>';
 const sec = (title, body) => `<details class="sec" open><summary>${title}</summary>${body}</details>`;
 function hypHTML(c) {
   const ic = docIcons(c.id, c.text, c.docs, c.arts);
@@ -998,21 +1031,38 @@ function personHTML(p) {
   const kv = [['Как в записи', p.written], ['Варианты', p.variants], ['Годы', yrs], ['Места', p.places], ['Юрисдикция', p.juris], ['Занятие', p.occ],
     ['Вероисп.', p.conf], ['Статус', (CAND_NAME[p.cand] || p.cand) + ' · ' + (LIV_NAME[p.living] || p.living)], ['Родня по записям', p.reported]]
     .filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${k === 'Годы' ? v : esc(v)}</dd>`).join('');
-  const facts = (p.claims || []).map(id => CL.get(id)).filter(Boolean)
-    .sort((a, b) => ['doc2', 'doc1', 'open', 'hyp', 'family', 'rejected'].indexOf(a.lv) - ['doc2', 'doc1', 'open', 'hyp', 'family', 'rejected'].indexOf(b.lv));
-  const rels = nb.get(p.id).filter(edgeShown).map(e => {
+  // три блока: факты (по документам) · гипотезы (гипотезы поиска, открытые вопросы, семейные сведения и предания) · опровергнуто и не найдено
+  const ORD = ['doc2', 'doc1', 'open', 'hyp', 'research', 'family', 'rejected'];
+  const all = (p.claims || []).map(id => CL.get(id)).filter(c => c && claimShown(c)).sort((a, b) => ORD.indexOf(a.lv) - ORD.indexOf(b.lv));
+  const gone = c => c.lv === 'rejected' || c.type === 'negative-search';
+  const facts = all.filter(c => !gone(c) && c.lv.startsWith('doc')), hyps = all.filter(c => !gone(c) && !c.lv.startsWith('doc')), offs = all.filter(gone);
+  const claimCell = (c, lab) => cellHTML(c.id, c.text, c.docs, c.arts, `${lab}${esc(c.text)}
+      ${(c.lv === 'hyp' || c.lv === 'open') && c.next ? `<span class="need">${esc(c.next)}</span>` : ''}${c.lv === 'rejected' ? `<span class="reason">${esc(c.why)}</span>` : ''}`);
+  const lvLab = c => `<span class="lv lv-${c.lv}">${LV_NAME[c.lv]}</span>`;
+  const offLab = c => `<span class="lv lv-off">${c.lv === 'rejected' ? 'опровергнуто' : 'не найдено'}</span>`;
+  const relCell = (e, lab) => {
     const o = other(e, p.id);
     let role = T_NAME[e.t];
     if (e.t === 'parent') role = e.a === p.id ? 'ребёнок' : 'родитель';
-    return cellHTML('e:' + e.id + ':' + e.a + ':' + e.b, `${role}: ${pname(o)}`, e.docs, e.arts, `<span class="lv lv-${e.lv}">${LV_NAME[e.lv]}</span>${role}: ${plink(o)}
+    return cellHTML('e:' + e.id + ':' + e.a + ':' + e.b, `${role}: ${pname(o)}`, e.docs, e.arts, `${lab}${role}: ${plink(o)}
       ${e.end ? `<span class="ended">${e.end.kind === 'divorce' ? '✕ ' : ''}${esc(e.end.text)}</span>` : ''}
       ${e.why ? `<div class="sub">${esc(e.why)}</div>` : ''}${e.need ? `<span class="need">${esc(e.need)}</span>` : ''}${e.reason ? `<span class="reason">${esc(e.reason)}</span>` : ''}`);
-  }).join('');
-  return `<h2>${esc(p.name)}</h2><div class="sub">${esc(p.full)}</div>
+  };
+  // связи раскладываются так же: по документам — «Связи», семейные и гипотезы — в «Гипотезы», отброшенные — в «Опровергнуто»
+  const es = nb.get(p.id).filter(e => S.mode === 'conf' ? CONF_LV.has(e.lv) : true);
+  const relsDoc = es.filter(e => e.lv.startsWith('doc')), relsHyp = es.filter(e => e.lv === 'family' || e.lv === 'research'), relsOff = es.filter(e => e.lv === 'rejected');
+  const hypBody = hyps.map(c => claimCell(c, lvLab(c))).join('') + (relsHyp.length ? `<div class="subhead">Связи</div>` + relsHyp.map(e => relCell(e, `<span class="lv lv-${e.lv}">${LV_NAME[e.lv]}</span>`)).join('') : '');
+  const offBody = offs.map(c => claimCell(c, offLab(c))).join('') + relsOff.map(e => relCell(e, '<span class="lv lv-off">опровергнуто</span>')).join('');
+  const eyeOff = S.mode === 'conf';
+  const eye = `<button class="eye${S.showGone ? ' open' : ''}" id="eyetog" ${eyeOff ? 'disabled' : ''} aria-pressed="${!!S.showGone}"
+      title="${eyeOff ? 'В режиме «Только подтверждённые» опровергнутое не показывается' : S.showGone ? 'Скрыть опровергнутое и не найденное' : 'Показать опровергнутое и не найденное'}"
+      aria-label="${S.showGone ? 'Скрыть опровергнутое и не найденное' : 'Показать опровергнутое и не найденное'}">${S.showGone && !eyeOff ? ICON_EYE : ICON_EYE_OFF}</button>`;
+  return `<div class="phead"><h2>${esc(p.name)}</h2>${eye}</div><div class="sub">${esc(p.full)}</div>
     ${sec('Сведения', `<dl class="kv">${kv}</dl>`)}
-    ${facts.length ? sec('Факты и их подтверждение', facts.map(c => cellHTML(c.id, c.text, c.docs, c.arts, `<span class="lv lv-${c.lv}">${LV_NAME[c.lv]}</span>${esc(c.text)}
-      ${(c.lv === 'hyp' || c.lv === 'open') && c.next ? `<span class="need">${esc(c.next)}</span>` : ''}${c.lv === 'rejected' ? `<span class="reason">${esc(c.why)}</span>` : ''}`)).join('')) : ''}
-    ${rels ? sec('Связи', rels) : ''}
+    ${facts.length ? sec('Факты', facts.map(c => claimCell(c, lvLab(c))).join('')) : ''}
+    ${relsDoc.length ? sec('Связи', relsDoc.map(e => relCell(e, `<span class="lv lv-${e.lv}">${LV_NAME[e.lv]}</span>`)).join('')) : ''}
+    ${hypBody ? sec('Гипотезы', hypBody) : ''}
+    ${S.showGone && !eyeOff && offBody ? sec('Опровергнуто и не найдено', offBody) : ''}
     ${p.merge || p.notes ? sec('Заметки исследования', `<div class="sub">${esc([p.merge, p.notes].filter(Boolean).join(' · '))}</div>`) : ''}
     ${sec('Источники (шифры)', (p.arts || []).map(artLine).join('') || '<div class="sub">Нет</div>')}
     ${feedbackHTML(p)}`;
@@ -1106,9 +1156,9 @@ function openDocs(key) {
   $('vt').textContent = ref.title.length > 170 ? ref.title.slice(0, 170) + '…' : ref.title;
   $('vthumbs').innerHTML = ref.docs.map(d => { const a = D.arts[d.a] || {};
     return `<div class="tg"><div class="lab" title="${esc(a.title || d.a)}">${esc([a.repo, a.ref].filter(Boolean).join(', ') || a.title || d.a)}</div><div class="row">${
-      d.f.map(f => { const k = G.findIndex(g => g.f === f && g.a === d.a), g = G[k];
-        return g.k === 'img' ? `<button class="th" data-k="${k}" style="background-image:url('docs/${encodeURIComponent(d.a)}/${encodeURIComponent(f)}')" aria-label="Страница ${k + 1}"></button>`
-          : `<button class="th" data-k="${k}" aria-label="Документ ${k + 1}">${esc((f.split('.').pop() || '').toUpperCase())}</button>`; }).join('')}</div></div>`; }).join('');
+      G.map((g, k) => [g, k]).filter(([g]) => g.a === d.a).map(([g, k]) =>
+        g.k === 'img' ? `<button class="th" data-k="${k}" style="background-image:url('docs/${encodeURIComponent(d.a)}/${encodeURIComponent(g.f)}')" aria-label="Страница ${k + 1}"></button>`
+          : `<button class="th" data-k="${k}" aria-label="Документ ${k + 1}">${esc((g.f.split('.').pop() || '').toUpperCase())}</button>`).join('')}</div></div>`; }).join('');
   placeViewer(); $('viewer').hidden = false; showDoc(0);
 }
 function showDoc(k) {
@@ -1119,7 +1169,6 @@ function showDoc(k) {
   img.hidden = g.k !== 'img'; $('vfit').hidden = g.k !== 'img';
   if (g.k === 'img') { img.onload = fitDoc; img.src = url; }
   else if (g.k === 'pdf') st.insertAdjacentHTML('beforeend', `<iframe src="${url}" title="${esc(g.f)}"></iframe>`);
-  else if (g.k === 'html') st.insertAdjacentHTML('beforeend', `<iframe sandbox src="${url}" title="${esc(g.f)}"></iframe>`);
   else if (g.k === 'txt') { const pre = document.createElement('pre'); pre.textContent = 'Загрузка…'; st.appendChild(pre);
     fetch(url).then(r => r.text()).then(t => { pre.textContent = t; }).catch(() => { pre.textContent = 'Не удалось загрузить файл.'; }); }
   else st.insertAdjacentHTML('beforeend', `<div class="other">Файл ${esc(g.f)}<a href="${url}" download>Скачать</a></div>`);
@@ -1210,6 +1259,7 @@ function bindUI() {
   $('zout').onclick = () => { const a = area(); zoomAt(0.8, a.w / 2, a.h / 2); };
   // режим «По семьям»: цвет карточки — по фамилии семьи; фильтр — одна семья цветная, остальные серые
   $('famtog').onclick = () => setFamMode(!S.famMode);
+  $('modetog').onclick = () => setMode(MODES[(MODES.findIndex(m => m[0] === S.mode) + 1) % MODES.length][0]);
   $('fams').addEventListener('click', ev => {
     const b = ev.target.closest('[data-fam]'); if (!b) return;
     const prev = S.famFilter; applyFamFilter(S.famFilter === b.dataset.fam ? null : b.dataset.fam); renderFams(); relayout(famAnchor(S.famFilter || prev));
@@ -1219,6 +1269,7 @@ function bindUI() {
   $('t-person').onclick = () => { S.tab = 'person'; setMin(false); renderPanel(); };
   $('hide').onclick = () => setMin(!$('panel').classList.contains('min'));
   $('pbody').addEventListener('click', ev => {
+    if (ev.target.closest('#eyetog')) { S.showGone = !S.showGone; const t = $('pbody').scrollTop; renderPanel(); $('pbody').scrollTop = t; return; }
     const d = ev.target.closest('[data-doc]'), x = ev.target.closest('[data-ext]');
     if (d) { ev.stopPropagation(); openDocs(d.dataset.doc); return; }
     if (x) { ev.stopPropagation(); openExt(x.dataset.ext, x); return; }
@@ -1229,16 +1280,13 @@ function bindUI() {
   });
   bindViewer();
   $('pbody').addEventListener('submit', ev => { if (ev.target.id === 'fb') { ev.preventDefault(); sendFeedback(ev.target); } });
-  $('pbody').addEventListener('change', ev => {
-    if (ev.target.id === 'c-rej') { S.showRej = ev.target.checked; renderPanel(); relayout(null, false); }
-  });
   const q = $('q'), res = $('qres');
   q.addEventListener('input', () => {
     const t = norm(q.value.trim());
     if (t.length < 2) { res.hidden = true; return; }
     const words = t.split(/\s+/);
-    const hits = D.persons.filter(p => p.q && words.every(w => p.q.includes(w))).slice(0, 10);
-    const chits = D.claims.filter(c => c.q && words.every(w => c.q.includes(w)) && c.subj.some(x => P.has(x))).slice(0, 12);
+    const hits = D.persons.filter(p => p.q && allowed(p) && words.every(w => p.q.includes(w))).slice(0, 10);
+    const chits = D.claims.filter(c => c.q && claimShown(c) && words.every(w => c.q.includes(w)) && c.subj.some(x => P.has(x))).slice(0, 12);
     const snip = txt => { const i = norm(txt).indexOf(words[0]); const a = Math.max(0, i - 40); return (a ? '…' : '') + txt.slice(a, a + 150) + (txt.length > a + 150 ? '…' : ''); };
     res.innerHTML = (hits.length ? '<div class="grp">Люди</div>' + hits.map(p => `<button data-id="${p.id}">${esc(p.name)} <small>${esc(p.b?.t || '')} · ${esc(D.gens[p.gen]?.name || '')}</small></button>`).join('') : '') +
       (chits.length ? '<div class="grp">Утверждения</div>' + chits.map(c => `<button data-claim="${c.id}"><span class="lv lv-${c.lv}">${LV_NAME[c.lv]}</span><small>${esc(pname(c.subj.find(x => P.has(x))))}</small><span class="snip">${esc(snip(c.text))}</span></button>`).join('') : '') ||
