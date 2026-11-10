@@ -222,7 +222,8 @@ class TestDesignData(Base):
         self.assertEqual(me["name"], "Ветлугин Сергей")                     # пояснение после « — » не в имени
         pub, _ = self.tree("public")
         self.assertNotIn("story", self.person_in(pub, p))                  # рассказы — только по решению автора
-        self.kin("case", "set", "privacy.public_stories=allow")
+        self.assertIn("--by", self.kin("case", "set", "privacy.public_stories=allow", ok=False).stderr)
+        self.kin("case", "set", "privacy.public_stories=allow", "--by", "Автор дела")
         pub, _ = self.tree("public")
         self.assertIn("story", self.person_in(pub, p))
         self.assertTrue((self.case / "site" / "public" / "fonts" / "inter.css").is_file())
@@ -307,6 +308,25 @@ class TestLayoutCheck(Base):
         self.assertIn("theme/index.html", res.stderr)
         # зонд рабочий: выполненная напрямую, такая страница дала бы подставной итог
         self.assertTrue(any("ТЕМА" in w for w in self.site.check_layout(self.case / "site" / "private", page=theme / "index.html")))
+
+    def test_probe_server_rejects_foreign_host(self):
+        """Временный сервер проверки раскладки отдаёт tree.json только своему адресу (защита от DNS rebinding)."""
+        import http.client
+        self.person("Ветлугин Сергей")
+        self.kin("site", "build")
+        seen = {}
+
+        def fake_run(cmd, **kw):  # вместо Chrome — запросы к временному серверу с чужим и своим Host
+            url = cmd[-1]
+            port = int(url.split(":")[2].split("/")[0])
+            for host in (f"127.0.0.1:{port}", f"evil.example:{port}"):
+                c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+                c.request("GET", "/tree.json", headers={"Host": host})
+                seen[host.split(":")[0]] = c.getresponse().status
+            return mock.Mock(stdout="")
+        with mock.patch("subprocess.run", side_effect=fake_run):
+            self.assertIsNone(self.site.layout_probe(self.case / "site" / "private", "check=1"))
+        self.assertEqual(seen, {"127.0.0.1": 200, "evil.example": 421})
 
     def test_display_modes_nest_and_confirmed_hides_candidates(self):
         """«Только подтверждённые» ⊂ «Гипотезы поиска» ⊂ «Показать отброшенное»; кандидаты и гипотезы — не в первом режиме."""

@@ -419,6 +419,12 @@ def cmd_case_set(args) -> int:
                     raise KinError("Показ живых в публичной версии — решение автора дела: --by «Имя». "
                                    "Публикация данных живых людей требует их согласия (в РФ — 152-ФЗ).")
                 case.journal(by, "human-decision", "case.json", {"action": "public-living-allow"})
+            if key == "privacy.public_stories" and typed == "allow":
+                by = " ".join((args.by or "").split())
+                if by.casefold() in ("", "user"):
+                    raise KinError("Рассказы в публичной версии — решение автора дела: --by «Имя». В рассказах бывают "
+                                   "сведения о живых родственниках, а проверка утечек ловит не всё.")
+                case.journal(by, "human-decision", "case.json", {"action": "public-stories-allow"})
             target, leaf = case.config, key
             if "." in key:
                 head, leaf = key.split(".", 1)

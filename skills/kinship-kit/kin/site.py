@@ -226,12 +226,17 @@ def layout_probe(out: Path, query: str, page: Path | None = None) -> dict | None
         root.mkdir()
         shutil.copyfile(page or WEB / "index.html", root / "index.html")
         shutil.copyfile(out / "tree.json", root / "tree.json")
-        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(root)))
+        # временный сервер отдаёт tree.json (в приватной сборке — и живые люди): только запросы с Host этого адреса,
+        # как у kin site serve — защита от DNS rebinding чужой страницей в браузере пользователя
+        handler_cls = type("_ProbeHandler", (_Quiet,), {"allowed_hosts": frozenset({"__unset__"})})
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(handler_cls, directory=str(root)))
+        port = srv.server_address[1]
+        handler_cls.allowed_hosts = frozenset({f"127.0.0.1:{port}", f"localhost:{port}"})
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         try:
             cmd = [chrome, "--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars", f"--user-data-dir={tmp}/profile",
                    "--window-size=1440,1000", "--virtual-time-budget=12000", "--dump-dom",
-                   f"http://127.0.0.1:{srv.server_address[1]}/index.html?{query}"]
+                   f"http://127.0.0.1:{port}/index.html?{query}"]
             if hasattr(os, "geteuid") and os.geteuid() == 0:
                 cmd.insert(1, "--no-sandbox")  # под root Chrome без этого не запускается; выполняется только страница набора
             try:
