@@ -10,4 +10,7 @@
 Иконки пола на карточках сайта-схемы (`skills/kinship-kit/kin/web/icons/`): kareemovic2000, Noun Project, лицензия CC BY 3.0
 (указано в легенде сайта).
 
+Шрифт сайта-схемы Inter (`skills/kinship-kit/kin/web/fonts/`): © 2016 The Inter Project Authors, лицензия
+SIL Open Font License 1.1 (текст — `fonts/OFL.txt`, копируется в каждую сборку сайта). Файлы — подмножества Google Fonts, без изменений.
+
 Демонстрационное дело (`examples/demo`) полностью вымышлено: люди, места, архивы и шифры не существуют.

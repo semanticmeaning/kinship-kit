@@ -60,48 +60,16 @@
 "</svg>2+ documents<"
 ],
 [
-"</span>человек из дерева<",
-"</span>person from a family tree<"
-],
-[
 "</svg>1 документ<",
 "</svg>1 document<"
-],
-[
-"</span>кандидат из архива<",
-"</span>archive candidate<"
 ],
 [
 "</svg>семейные сведения<",
 "</svg>family information<"
 ],
 [
-"<b>тёмный ✓</b>&nbsp;— по документу",
-"<b>dark ✓</b>&nbsp;— by a document"
-],
-[
-"</svg>гипотеза поиска<",
-"</svg>research hypothesis<"
-],
-[
-">серый — не подтверждено<",
-">grey — not confirmed<"
-],
-[
-"</svg>возможно, одно лицо<",
-"</svg>possibly the same person<"
-],
-[
 "</svg>отброшено<",
 "</svg>rejected<"
-],
-[
-"</svg>супруги<",
-"</svg>spouses<"
-],
-[
-"</svg>брак расторгнут<",
-"</svg>marriage dissolved<"
 ],
 [
 ">наведите на человека — его линии<",
@@ -130,14 +98,6 @@
 [
 "aria-label=\"Следующая страница\"",
 "aria-label=\"Next page\""
-],
-[
-"role=\"tab\">Линии поиска<",
-"role=\"tab\">Search lines<"
-],
-[
-"role=\"tab\">Человек<",
-"role=\"tab\">Person<"
 ],
 [
 "title=\"Свернуть панель\" aria-label=\"Свернуть панель\"",
@@ -196,26 +156,6 @@
 "<div class=\"nm\">Living person</div>"
 ],
 [
-"'possibly-living' ? 'р. ' : ''",
-"'possibly-living' ? 'b. ' : ''"
-],
-[
-"`<b>✓ ${p.docs} док.</b>`",
-"`<b>✓ ${p.docs} doc.</b>`"
-],
-[
-"badges.push('<i>кандидат</i>')",
-"badges.push('<i>candidate</i>')"
-],
-[
-"badges.push('со слов семьи')",
-"badges.push('family-reported')"
-],
-[
-"title=\"Свернуть родню\" aria-label=\"Свернуть родню\"",
-"title=\"Collapse relatives\" aria-label=\"Collapse relatives\""
-],
-[
 "title=\"Показать родню: ${n}\" aria-label=\"Показать родню: ${n}\"",
 "title=\"Show relatives: ${n}\" aria-label=\"Show relatives: ${n}\""
 ],
@@ -232,22 +172,6 @@
 "/ждём|await|wait/i.test(l.state)"
 ],
 [
-"<div class=\"sub\">Открытых гипотез нет.</div>",
-"<div class=\"sub\">No open hypotheses.</div>"
-],
-[
-"<h4>Прочее</h4>",
-"<h4>Other</h4>"
-],
-[
-"`<h3>Отброшено</h3>`",
-"`<h3>Rejected</h3>`"
-],
-[
-"`<div class=\"meta\">Данные на ${esc(D.meta.asof)} · версия ${esc(D.meta.version)} · ${D.persons.length} чел., ${D.edges.length} связей</div>`",
-"`<div class=\"meta\">Data as of ${esc(D.meta.asof)} · version ${esc(D.meta.version)} · ${D.persons.length} people, ${D.edges.length} links</div>`"
-],
-[
 "title=\"Документы: ${files}\" aria-label=\"Документы: ${files}\"",
 "title=\"Documents: ${files}\" aria-label=\"Documents: ${files}\""
 ],
@@ -260,48 +184,8 @@
 "aria-label=\"External source\""
 ],
 [
-"`<h2>Живой человек</h2><p class=\"sub\">Данные живых людей на схеме не показываются.</p>`",
-"`<h2>Living person</h2><p class=\"sub\">Data about living people is not shown on the tree.</p>`"
-],
-[
-"' <span class=\"ok-mark\">✓ документ</span>'",
-"' <span class=\"ok-mark\">✓ document</span>'"
-],
-[
-"[dt(p.b, 'род. '), dt(p.d, 'смерть: ')]",
-"[dt(p.b, 'born: '), dt(p.d, 'died: ')]"
-],
-[
-"[['Как в записи', p.written], ['Варианты', p.variants], ['Годы', yrs], ['Места', p.places], ['Юрисдикция', p.juris], ['Занятие', p.occ],",
-"[['As recorded', p.written], ['Variants', p.variants], ['Years', yrs], ['Places', p.places], ['Jurisdiction', p.juris], ['Occupation', p.occ],"
-],
-[
-"['Вероисп.', p.conf], ['Статус',",
-"['Religion', p.conf], ['Status',"
-],
-[
 "['Родня по записям', p.reported]]",
 "['Relatives in records', p.reported]]"
-],
-[
-"${k === 'Годы' ? v : esc(v)}",
-"${k === 'Years' ? v : esc(v)}"
-],
-[
-"role = e.a === p.id ? 'ребёнок' : 'родитель';",
-"role = e.a === p.id ? 'child' : 'parent';"
-],
-[
-"sec('Сведения', `<dl",
-"sec('Details', `<dl"
-],
-[
-"sec('Заметки исследования',",
-"sec('Research notes',"
-],
-[
-"sec('Источники (шифры)', (p.arts || []).map(artLine).join('') || '<div class=\"sub\">Нет</div>')",
-"sec('Sources (references)', (p.arts || []).map(artLine).join('') || '<div class=\"sub\">None</div>')"
 ],
 [
 "` · о связи: ${esc(f.relation)}",
@@ -328,10 +212,6 @@
 "sec('Family information', items)"
 ],
 [
-"sec('Сведения семьи', `${items || '<div class=\"sub\">Принятых сведений пока нет. Если вы что-то знаете об этом человеке или его родных — напишите: сообщение появится здесь после проверки.</div>'}",
-"sec('Family information', `${items || '<div class=\"sub\">No accepted information yet. If you know something about this person or their family, write it here: your message will appear after it has been checked.</div>'}"
-],
-[
 "<label for=\"fb-about\">О ком или о чём</label>",
 "<label for=\"fb-about\">About whom or what</label>"
 ],
@@ -350,10 +230,6 @@
 [
 "placeholder=\"Даты, места, имена, кем приходился, откуда это известно: рассказ, документ, фото\"",
 "placeholder=\"Dates, places, names, how they were related, how you know it: a story, a document, a photo\""
-],
-[
-"<label for=\"fb-author\">Ваше имя *</label>",
-"<label for=\"fb-author\">Your name *</label>"
 ],
 [
 "Согласен(на) на обработку моего имени и e-mail для работы над историей семьи</label>",
@@ -464,10 +340,6 @@
 "textContent = open ? 'Hide' : 'Show'"
 ],
 [
-"(в записи: ${esc(d.raw)})",
-"(as recorded: ${esc(d.raw)})"
-],
-[
 "esc(info.name)",
 "esc(info.name_en || info.name)"
 ],
@@ -484,43 +356,407 @@
 "`Display: ${name}. Click to switch`"
 ],
 [
-"c.lv === 'rejected' ? 'опровергнуто' : 'не найдено'",
-"c.lv === 'rejected' ? 'refuted' : 'not found'"
+"aria-label=\"Очистить поиск\"",
+"aria-label=\"Clear search\""
 ],
 [
-"`<div class=\"subhead\">Связи</div>`",
-"`<div class=\"subhead\">Relationships</div>`"
+"</svg>человек</div>",
+"</svg>person</div>"
 ],
 [
-"'<span class=\"lv lv-off\">опровергнуто</span>'",
-"'<span class=\"lv lv-off\">refuted</span>'"
+"</svg>кандидат из архива</div>",
+"</svg>archive candidate</div>"
 ],
 [
-"'В режиме «Только подтверждённые» опровергнутое не показывается'",
-"'Refuted items are not shown in the “Confirmed only” mode'"
+"</svg>выбранный</div>",
+"</svg>selected</div>"
 ],
 [
-"'Скрыть опровергнутое и не найденное'",
-"'Hide refuted and not found'"
+"</svg>версия исследования</div>",
+"</svg>research version</div>"
 ],
 [
-"'Показать опровергнутое и не найденное'",
-"'Show refuted and not found'"
+"</svg>рамка версий</div>",
+"</svg>version frame</div>"
 ],
 [
-"sec('Факты',",
-"sec('Facts',"
+"</svg>к потенциальной</div>",
+"</svg>to a potential parent</div>"
 ],
 [
-"sec('Связи',",
-"sec('Relationships',"
+"</svg>потенциальная (мать / отец)</div>",
+"</svg>potential (mother / father)</div>"
 ],
 [
-"sec('Гипотезы',",
-"sec('Hypotheses',"
+"</svg>брак</div>",
+"</svg>marriage</div>"
 ],
 [
-"sec('Опровергнуто и не найдено',",
-"sec('Refuted and not found',"
+"</svg>развод</div>",
+"</svg>divorce</div>"
+],
+[
+"</svg>вдовство</div>",
+"</svg>widowhood</div>"
+],
+[
+"</svg>бывшие супруги</div>",
+"</svg>former spouses</div>"
+],
+[
+"сильная связь с древом: 2+ документа",
+"strong link to the tree: 2+ documents"
+],
+[
+"средняя: 1 документ о связи",
+"medium: 1 document on the link"
+],
+[
+"нет галочек: документов о связи нет",
+"no ticks: no documents on the link"
+],
+[
+"наведите на человека — его линии",
+"hover a person to see their lines"
+],
+[
+"aria-label=\"Меню\"",
+"aria-label=\"Menu\""
+],
+[
+"<b>Древо</b>",
+"<b>Family tree</b>"
+],
+[
+"aria-label=\"Закрыть меню\"",
+"aria-label=\"Close menu\""
+],
+[
+"<h3>Что показывать</h3>",
+"<h3>What to show</h3>"
+],
+[
+"role=\"tab\">Персона</button>",
+"role=\"tab\">Person</button>"
+],
+[
+"role=\"tab\">Гипотезы</button>",
+"role=\"tab\">Hypotheses</button>"
+],
+[
+"role=\"tab\">Поиск</button>",
+"role=\"tab\">Search</button>"
+],
+[
+"[[fa, 'M', 'отец'], [mo, 'F', 'мать']]",
+"[[fa, 'M', 'father'], [mo, 'F', 'mother']]"
+],
+[
+"role: sex === 'F' ? 'мать' : sex === 'M' ? 'отец' : 'родитель'",
+"role: sex === 'F' ? 'mother' : sex === 'M' ? 'father' : 'parent'"
+],
+[
+"['гипотеза', 'h']",
+"['hypothesis', 'h']"
+],
+[
+"['отброшено', '']",
+"['rejected', '']"
+],
+[
+"['со слов семьи', '']",
+"['family-reported', '']"
+],
+[
+"title=\"Документов о связи с древом: ${p.ckN}\"",
+"title=\"Documents on the link to the tree: ${p.ckN}\""
+],
+[
+"'Закрыть'",
+"'Close'"
+],
+[
+"'Свернуть панель'",
+"'Collapse panel'"
+],
+[
+"'Развернуть панель'",
+"'Expand panel'"
+],
+[
+"<b>Нужно:</b>",
+"<b>Needed:</b>"
+],
+[
+"grp('Открытые гипотезы',",
+"grp('Open hypotheses',"
+],
+[
+">полностью</button>",
+">in full</button>"
+],
+[
+"open ? 'свернуть' : 'полностью'",
+"open ? 'collapse' : 'in full'"
+],
+[
+"grp('Что известно',",
+"grp('What is known',"
+],
+[
+"grp('Кого ищем',",
+"grp('Who we are looking for',"
+],
+[
+"PI.q, 'Прочее',",
+"PI.q, 'Other',"
+],
+[
+"PI.route, 'Отброшено',",
+"PI.route, 'Rejected',"
+],
+[
+"Данные на ${esc(D.meta.asof)} · версия ${esc(D.meta.version)} · ${D.persons.filter(p => !p.pot).length} чел., ${D.edges.filter(e => !e.syn).length} связей",
+"Data as of ${esc(D.meta.asof)} · version ${esc(D.meta.version)} · ${D.persons.filter(p => !p.pot).length} people, ${D.edges.filter(e => !e.syn).length} links"
+],
+[
+"p.sex === 'F' ? 'родилась' : p.sex === 'M' ? 'родился' : 'родился(ась)', died = p.sex === 'F' ? 'умерла' : p.sex === 'M' ? 'умер' : 'умер(ла)'",
+"p.sex === 'F' ? 'born' : p.sex === 'M' ? 'born' : 'born', died = p.sex === 'F' ? 'died' : p.sex === 'M' ? 'died' : 'died'"
+],
+[
+"'Кто родители?'",
+"'Who are the parents?'"
+],
+[
+"'Кто дети?'",
+"'Who are the children?'"
+],
+[
+"'Тот ли это человек?'",
+"'Is this the same person?'"
+],
+[
+"'Кто братья и сёстры?'",
+"'Who are the siblings?'"
+],
+[
+"'Какое родство?'",
+"'What is the kinship?'"
+],
+[
+"'Откуда родом?'",
+"'Where were they from?'"
+],
+[
+"`Когда ${born}?`",
+"`When was this person ${born}?`"
+],
+[
+"`Когда и где ${died}?`",
+"`When and where this person ${died}?`"
+],
+[
+"['marr', 'Брак', '']",
+"['marr', 'Marriage', '']"
+],
+[
+"'Другие вопросы'",
+"'Other questions'"
+],
+[
+"'Возможно, одно лицо'",
+"'Possibly the same person'"
+],
+[
+"(e.a === p.id ? 'Ребёнок' : 'Родитель')",
+"(e.a === p.id ? 'Child' : 'Parent')"
+],
+[
+"'Брат / сестра'",
+"'Sibling'"
+],
+[
+"'Супруг(а)' : 'Родство'",
+"'Spouse' : 'Kinship'"
+],
+[
+"<div class=\"pempty\">Событий пока нет.</div>",
+"<div class=\"pempty\">No events yet.</div>"
+],
+[
+"plural(n, 'версия', 'версии', 'версий')",
+"plural(n, 'version', 'versions', 'versions')"
+],
+[
+"'Супруги' : p.sex === 'M' ? 'Супруга' : p.sex === 'F' ? 'Супруг' : 'Супруг(а)'",
+"'Spouses' : p.sex === 'M' ? 'Wife' : p.sex === 'F' ? 'Husband' : 'Spouse'"
+],
+[
+"grp('Родители',",
+"grp('Parents',"
+],
+[
+"grp('Дети',",
+"grp('Children',"
+],
+[
+"grp('Братья и сёстры',",
+"grp('Siblings',"
+],
+[
+"'Документы: ' + p.name",
+"'Documents: ' + p.name"
+],
+[
+"aria-label=\"Открыть документы\"",
+"aria-label=\"Open documents\""
+],
+[
+"Открыть все документы",
+"Open all documents"
+],
+[
+"plural(qN, 'открытый вопрос', 'открытых вопроса', 'открытых вопросов')",
+"plural(qN, 'open question', 'open questions', 'open questions')"
+],
+[
+"PI.story, 'Рассказ',",
+"PI.story, 'Story',"
+],
+[
+"PI.life, 'Жизнь', 'кратко, по годам'",
+"PI.life, 'Life', 'in brief, by year'"
+],
+[
+"PI.fam, 'Семья',",
+"PI.fam, 'Family',"
+],
+[
+"PI.doc, 'Документы и фото',",
+"PI.doc, 'Documents and photos',"
+],
+[
+"<span>${dot('d2')}2+ документа</span><span>${dot('d1')}1 документ</span><span>${dot('df')}со слов семьи</span><span>${dot('dq')}версия</span><span>${dot('dw')}противоречие</span>",
+"<span>${dot('d2')}2+ documents</span><span>${dot('d1')}1 document</span><span>${dot('df')}family-reported</span><span>${dot('dq')}version</span><span>${dot('dw')}contradiction</span>"
+],
+[
+"part('pro', 'за', m[1]) + (m[2] ? part('con', 'против', m[2]) : '') : part('', 'основание', t)",
+"part('pro', 'for', m[1]) + (m[2] ? part('con', 'against', m[2]) : '') : part('', 'basis', t)"
+],
+[
+"<b>Ищем сейчас:</b>",
+"<b>Searching now:</b>"
+],
+[
+"' Следующий шаг — '",
+"' Next step — '"
+],
+[
+"{ x: 'версии исключают друг друга', c: 'версии совместимы' }",
+"{ x: 'versions exclude each other', c: 'versions are compatible' }"
+],
+[
+"<div class=\"pempty\">Пока нет.</div>",
+"<div class=\"pempty\">None yet.</div>"
+],
+[
+"['Как в записи', p.written]",
+"['As written', p.written]"
+],
+[
+"['Варианты', p.variants",
+"['Variants', p.variants"
+],
+[
+"['Места', p.places]",
+"['Places', p.places]"
+],
+[
+"['Юрисдикция', p.juris]",
+"['Jurisdiction', p.juris]"
+],
+[
+"['Занятие', p.occ]",
+"['Occupation', p.occ]"
+],
+[
+"['Вероисповедание', p.conf]",
+"['Religion', p.conf]"
+],
+[
+"`линия «${line.title.split(':')[0]}»`",
+"`line “${line.title.split(':')[0]}”`"
+],
+[
+"'Открытые вопросы', d.Q.size",
+"'Open questions', d.Q.size"
+],
+[
+"<div class=\"pempty\">Открытых вопросов нет.</div>",
+"<div class=\"pempty\">No open questions.</div>"
+],
+[
+"'Подтверждённые факты'",
+"'Confirmed facts'"
+],
+[
+"Подтверждённых документами фактов пока нет.",
+"No facts confirmed by documents yet."
+],
+[
+"'Ход поиска'",
+"'Search progress'"
+],
+[
+"'Проверено — не найдено', 'Где искали и ничего не нашли — чтобы не искать там повторно.'",
+"'Checked — not found', 'Where we searched and found nothing — so as not to search there again.'"
+],
+[
+"'Отброшенные версии', 'Версии, которые исследование сняло, — с причиной и документом.'",
+"'Rejected versions', 'Versions the research dropped — with the reason and the document.'"
+],
+[
+"'Решения и слияния', 'Почему разные записи отнесены к этому человеку (или нет).'",
+"'Decisions and merges', 'Why different records were attributed to this person (or not).'"
+],
+[
+"'Контекст поиска', 'Как записан человек, где хранятся нужные книги, какие приходы и волости — справка для следующих запросов.'",
+"'Search context', 'How the person was recorded, where the needed books are kept, which parishes and volosts — a reference for the next requests.'"
+],
+[
+"'Последнее изменение', 'Когда и в каком чате менялись сведения.'",
+"'Last change', 'When and in which chat the information was changed.'"
+],
+[
+"`чат «${esc(ch.chat)}»` : 'без подписи чата'",
+"`chat “${esc(ch.chat)}”` : 'no chat signature'"
+],
+[
+"Это последнее изменение всего дела: по отдельному человеку в данных схемы даты пока нет.",
+"This is the last change of the whole case: the data has no per-person date yet."
+],
+[
+"Выберите человека на схеме.",
+"Select a person on the tree."
+],
+[
+"p.sex === 'F' ? 'о ней' : p.sex === 'M' ? 'о нём' : 'об этом человеке'",
+"p.sex === 'F' ? 'about her' : p.sex === 'M' ? 'about him' : 'about this person'"
+],
+[
+"`Вы что-то знаете ${about}?`",
+"`Do you know something ${about}?`"
+],
+[
+"Даты, места, рассказы, фотографии — сообщение появится здесь после проверки.",
+"Dates, places, stories, photos — your message will appear here after review."
+],
+[
+">Дополнить</button>",
+">Add</button>"
+],
+[
+"placeholder=\"Ваше имя *\" aria-label=\"Ваше имя\"",
+"placeholder=\"Your name *\" aria-label=\"Your name\""
 ]
 ]
