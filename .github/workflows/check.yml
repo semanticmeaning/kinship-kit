@@ -10,8 +10,8 @@ jobs:
       matrix:
         python: ["3.10", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
       - run: pip install ruff==0.17.3   # версия закреплена: новые правила не ломают сборку внезапно
@@ -21,8 +21,8 @@ jobs:
     # все тесты в Windows (без ruff и проверки репозитория — они в задаче check)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - shell: bash
