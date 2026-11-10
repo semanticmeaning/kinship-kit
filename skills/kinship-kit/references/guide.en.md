@@ -35,7 +35,7 @@ Then: `kin setup --yes --surname "…" --title "…" --author-name "…" --autho
 | A claim | `kin claim add --type birth --subject P-… --statement "…" --date 1885-03-02 --sources A-… --status single-source` |
 | A relationship (stated in a source) | `kin rel add P-A parent-of P-B --claims C-… --status single-source` |
 | Hypothesis, place | `kin add hypotheses|places --set field=value …` |
-| Task from a template | `kin task new metric-books|archive-catalog|online-database|library|archive-request|family-interview --goal "…" [--hypothesis H-…]` |
+| Task from a template | `kin task new metric-books|archive-catalog|online-database|library|archive-request|archive-download|family-interview|tree-review --goal "…" [--hypothesis H-…]` |
 | Task progress | `kin task start|block|review|done|close T-… [--reason …] [--evidence A-…]`; consent only by a person: `kin task consent T-… --granted --by "Name"` |
 | Search log (also empty results) | `kin search add --task T-… --source … --query … --period 1880/1890 --result not-found --disallowed … --repeat-when …` |
 | Hypothesis decision | `kin hypothesis status H-… supported|weakened|parked|rejected|accepted --reason "…" [--reopen "…"]` |
@@ -56,6 +56,9 @@ Sign changes with the role: `--as "Archive Researcher"` (or `KIN_ACTOR`). Never 
 1. New material is an **artifact, not a fact**: `kin source add` first, then a claim with an assessment.
 2. Copies, indexes, mirrors and retellings of one record are **one independence group**.
 3. `corroborated` requires **two independent groups** and a rationale (`kin audit` treats it as an error otherwise).
+   A family tree or family story (`family-tree`, `family-oral`) is a separate group **only** for facts about living people and
+   one generation from them (themselves, their parents and children) — what the family knows first-hand. For more distant
+   ancestors family information is a lead for the search, not a second confirmation (`kin audit` warns).
 4. A document is not a person: a record in a source is a `mention`; linking it to a `person` is a separate, justified decision.
    Do not merge namesakes by name, age or village: two persons + an `identity` claim with status `hypothesis`.
 5. A relationship only if the kinship is **stated in a source**; a shared patronymic or village is a hypothesis.

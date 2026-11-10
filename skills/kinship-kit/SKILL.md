@@ -61,7 +61,7 @@ python3 <папка этого навыка>/kin.py <команда>      # да
 | Утверждение (факт из источников) | `kin claim add --type birth --subject P-… --statement "…" --date 1885-03-02 --sources A-… --status single-source` |
 | Связь (родство названо в источнике) | `kin rel add P-A parent-of P-B --claims C-… --status single-source` |
 | Гипотеза, место | `kin add hypotheses|places --set поле=значение …` |
-| Задача по шаблону | `kin task new metric-books|archive-catalog|online-database|library|archive-request|family-interview --goal "…" [--hypothesis H-…] [--value 1-5] [--cost free|paid] [--access online|request|onsite]` → `tasks/T-….md` |
+| Задача по шаблону | `kin task new metric-books|archive-catalog|online-database|library|archive-request|archive-download|family-interview|tree-review --goal "…" [--hypothesis H-…] [--value 1-5] [--cost free|paid] [--access online|request|onsite]` → `tasks/T-….md` |
 | Ход задачи | `kin task start|block|review|done|close T-… [--reason …] [--evidence A-…]`; согласие пользователя — `kin task consent T-… --granted --by «Имя»` (только человек) |
 | Следующее действие | `kin next` — ранжирование с причинами; недоступное (платно без согласия, лимит попыток) — отдельно |
 | Поиск (и пустой) | `kin search add --task T-… --source … --query … --variants … --period 1880/1890 --result not-found --limits … --allowed … --disallowed … --repeat-when …`; проверить до поиска — `kin search check --source … --query …` |
@@ -91,6 +91,9 @@ python3 <папка этого навыка>/kin.py <команда>      # да
 1. Новый материал — **артефакт, а не факт**. Сначала `kin source add`, потом утверждение с оценкой.
 2. Копии, индексы, зеркала и пересказы одной записи — **одна группа независимости** (`--group`). Индекс сайта и скан той же метрики — одна группа.
 3. `corroborated` — только при **двух независимых группах** источников и с `rationale`. `kin audit` считает это ошибкой.
+   Семейное дерево и рассказы родственников (`family-tree`, `family-oral`) — отдельная группа **только** для сведений о живых
+   и на одно поколение от них (сами люди, их родители и дети): это то, что семья знает сама. О более далёких предках
+   семейные сведения — подсказка для поиска, а не второе подтверждение (`kin audit` предупредит).
 4. Документ ≠ человек. Запись в источнике — `mention`; отождествление с `person` — отдельное решение с `link_rationale`.
    Одноимённых людей не сливать по ФИО, возрасту или деревне: два `person` + утверждение `identity` со статусом `hypothesis`.
 5. Связь (`rel`) — только если родство **прямо названо в источнике**. Общее отчество или деревня — гипотеза
