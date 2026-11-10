@@ -43,7 +43,7 @@ Then: `kin setup --yes --surname "…" --title "…" --author-name "…" --autho
 | Archive requests | `kin request add …`, `kin request sent Q-… --date … --number …`, `kin request answer Q-… --artifacts A-…` |
 | Search the case | `kin find <words>` (any grammatical case, ё/е-insensitive) |
 | Scans from an online archive | `kin downloader list` → `kin downloader build <adapter> --out f.js` (a script the user pastes into the browser console + instructions) → `kin source import-download <folder>`; a new site — write an adapter per `references/downloaders.md` |
-| Site | `kin site build [--profile public]`, `kin site serve`, `kin site publish --to <folder>` (only with the user's consent) |
+| Site | `kin site build [--profile public]`, `kin site serve`, `kin site publish --to <folder>` (only with the user's consent); stories — `stories/P-….md`, portraits and version frames — `case.json` → `site` (`docs/deploy.md`) |
 | Family reports | `kin case set feedback.enabled=true`, `kin feedback serve`, `kin feedback list|show|accept|reject` |
 | Exchange | `kin export --out f.json`, `kin import f.json`, `kin gedcom export|import`, `kin backup`, `kin restore` |
 | Agent roles | `kin agents install` (Claude Code `.claude/agents`, Codex `.codex/agents`) |

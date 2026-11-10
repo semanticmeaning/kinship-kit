@@ -4,7 +4,7 @@ description: Генеалогическое исследование (бывши
 license: MIT (основано на ex-ussr-kinship-research © 2026 Denis Shiryaev)
 compatibility: Python 3.10+ (только стандартная библиотека), shell. Claude Code, Codex и другие клиенты с поддержкой Agent Skills.
 metadata:
-  version: "0.7.0"
+  version: "0.8.0"
   language: "ru"
   reply_language: "user"
 ---
@@ -73,7 +73,7 @@ python3 <папка этого навыка>/kin.py <команда>      # да
 | Посмотреть запись и ссылки на неё | `kin show P-0002`, `kin list claims --where status=hypothesis` |
 | Слить дубликат / разделить | `kin person merge P-дубль P-основной` (нужно identity-утверждение ≥ corroborated и пройденное ревью), `kin person unmerge P-… --reason …` |
 | Корень схемы, линии поиска | `kin case set root_person=P-…`, `kin case line add <id> title=… state="ищем сейчас" color=#b5651d` |
-| Сайт-схема | `kin site build [--profile public]`, `kin site serve` → http://127.0.0.1:8080, выкладка — `kin site publish --to <папка>` (только с согласия пользователя); своё оформление — `kin site theme init [--full]` |
+| Сайт-схема | `kin site build [--profile public]`, `kin site serve` → http://127.0.0.1:8080, выкладка — `kin site publish --to <папка>` (только с согласия пользователя); своё оформление — `kin site theme init [--full]`; рассказы — `stories/P-….md`, портреты и рамки версий — `case.json` → `site` (`docs/deploy.md`) |
 | Публикация живых (решает только автор дела) | человек: `kin update P-… publication=allow|deny`; всё дело: `kin case set privacy.public_living=allow --by «Имя»`; закрывать скрытое вместо остановки сборки: `kin case set privacy.on_leak=redact` |
 | Роли агентов | `kin agents install` → `.claude/agents/*.md`, `.codex/agents/*.toml` в папке дела |
 | Поиск по делу | `kin find <слова>` (имена в любом падеже, ё/е) |
