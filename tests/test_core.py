@@ -334,6 +334,85 @@ class TestPrivacyEdgeCases(Base):
         self.assertEqual(get(f"evil.example:{port}"), 421)
 
 
+class TestAuditConsistency(Base):
+    """Эвристики согласованности (предупреждения) — по опыту ревью схемы реального дела."""
+
+    def warns(self, text):
+        return [w for w in self.audit()["warnings"] if text in w]
+
+    def rel(self, a, kind, b, *extra):
+        return json.loads(self.kin("rel", "add", a, kind, b, *extra, "--json").stdout)["relationship_id"]
+
+    def claim(self, *args):
+        return json.loads(self.kin("claim", "add", *args, "--json").stdout)["claim_id"]
+
+    def test_people_and_relationships(self):
+        a = self.add_source("svid", group="g1")
+        father = self.person("Ветлугин Павел Иванович", "deceased", "identity-confirmed", "--sex", "m", "--birth", "1880", "--death", "1910")
+        son = self.person("Ветлугин Иван Афанасьевич", "deceased", "identity-confirmed", "--sex", "m", "--birth", "1925")
+        wife = self.person("Сомов Пётр Ильич", "deceased", "identity-confirmed", "--sex", "m", "--birth", "1882")
+        cand = self.person("Ветлугин Кандидат", "deceased", "candidate", "--sex", "m")
+        r1 = self.rel(father, "parent-of", son, "--sources", a, "--status", "single-source")
+        r2 = self.rel(father, "spouse-of", wife, "--sources", a, "--status", "single-source")
+        r3 = self.rel(cand, "sibling-of", son, "--sources", a, "--status", "single-source")
+        self.assertTrue(self.warns(f"{r1}: отчество"))           # Афанасьевич при отце Павле
+        self.assertTrue(self.warns(f"{r1}: {son} родился(ась) позже смерти"))  # 1925 при смерти отца в 1910
+        self.assertTrue(self.warns(f"{r2}: супруги одного пола"))
+        self.assertTrue(self.warns(f"{r3}: связь single-source, а {cand} ещё candidate"))
+        young = self.person("Ветлугин Внук Павлович", "deceased", "identity-confirmed", "--sex", "m", "--birth", "1885")
+        r4 = self.rel(father, "parent-of", young, "--sources", a, "--status", "single-source")
+        self.assertTrue(self.warns(f"{r4}: {young} родился(ась) раньше, чем {father} исполнилось 12"))
+        self.assertFalse(self.warns(f"{r4}: отчество"))           # Павлович при отце Павле — без тревоги
+        self.assertEqual(self.audit()["errors"], [])               # только предупреждения
+
+    def test_claims(self):
+        a = self.add_source("svid", group="g1")
+        m = self.person("Ветлугин Иван", "deceased", "identity-confirmed", "--sex", "m", "--birth", "1880")
+        f = self.person("Ветлугина Мария", "deceased", "identity-confirmed", "--sex", "f")
+        x = self.person("Ветлугин Пётр", "deceased", "candidate", "--sex", "m")
+        c1 = self.claim("--type", "identity", "--subject", f"{m};{f};{x}", "--statement", "Возможно, одно лицо", "--status", "hypothesis")
+        self.assertTrue(self.warns(f"{c1}: identity на 3 лиц"))
+        self.assertTrue(self.warns(f"{c1}: identity объединяет мужчину и женщину"))
+        self.rel(m, "parent-of", x, "--sources", a, "--status", "single-source")
+        c2 = self.claim("--type", "parentage", "--subject", f"{m};{x}", "--statement", "Иван — отец Петра", "--status", "hypothesis")
+        self.assertTrue(self.warns(f"{c2}: гипотеза, а связь"))
+        c3 = self.claim("--type", "birth", "--subject", m, "--date", "1890", "--statement", "Родился в 1890 году в Кленовке",
+                        "--sources", a, "--status", "single-source")
+        self.assertTrue(self.warns(f"{c3}: дата 1890 не сходится с карточкой"))
+        c4 = self.claim("--type", "residence", "--subject", m, "--statement", "Жил в деревне Кленовка до войны", "--status", "hypothesis")
+        c5 = self.claim("--type", "residence", "--subject", f, "--statement", "Жил в  деревне Кленовка до войны", "--status", "hypothesis")
+        self.assertTrue(self.warns(f"{c4}, {c5}: одинаковый текст"))
+
+    def test_stale_reference_to_merged_person(self):
+        a = self.add_source("svid", group="g1")
+        p1 = self.person("Ветлугин Иван", "deceased", "identity-confirmed")
+        p2 = self.person("Ветлугин Иван Петрович", "deceased", "candidate")
+        c = self.claim("--type", "residence", "--subject", p1, "--statement", "Жил в Кленовке", "--sources", a,
+                       "--status", "single-source", "--rationale", f"Как и у {p2}, двор 14", "--next", f"Сверить с {p2}")
+        self.kin("person", "merge", p2, p1, "--force", "--by", "Тест", "--reason", "одно лицо")
+        self.assertTrue(self.warns(f"{c}.rationale: упоминается {p2}, слитый с {p1}"))
+        self.assertTrue(self.warns(f"{c}.next_action: упоминается {p2}"))
+
+    def test_family_tree_counts_only_near_living(self):
+        doc = self.add_source("svid", group="g1")
+        story = Path(self.tmp.name) / "story.txt"
+        story.write_text("рассказ семьи", encoding="utf-8")
+        oral = json.loads(self.kin("source", "add", str(story), "--title", "Рассказ", "--kind", "family-oral",
+                                   "--group", "fam", "--json").stdout)["artifact_id"]
+        me = self.person("Ветлугина Анна", "living", "identity-confirmed", "--birth", "1952")
+        dad = self.person("Ветлугин Сергей", "deceased", "identity-confirmed", "--birth", "1921")
+        grand = self.person("Ветлугин Пётр", "deceased", "identity-confirmed", "--birth", "1885")
+        near = self.claim("--type", "parentage", "--subject", f"{dad};{me}", "--statement", "Сергей — отец Анны",
+                          "--sources", f"{doc};{oral}", "--status", "corroborated", "--rationale", "свидетельство и рассказ")
+        self.rel(dad, "parent-of", me, "--claims", near, "--status", "corroborated", "--rationale", "две группы")
+        far = self.claim("--type", "parentage", "--subject", f"{grand};{dad}", "--statement", "Пётр — отец Сергея",
+                         "--sources", f"{doc};{oral}", "--status", "corroborated", "--rationale", "метрика и рассказ")
+        self.assertFalse(self.warns(f"{near}: corroborated держится на семейном дереве"))
+        self.assertTrue(self.warns(f"{far}: corroborated держится на семейном дереве"))
+        self.kin("update", far, "status=single-source")
+        self.assertFalse(self.warns(f"{far}: независимых групп"))  # семейный рассказ о деде не считается второй группой
+
+
 class TestLockAndRollback(Base):
     def _lock_file(self, content: str, age: float = 0) -> Path:
         lock = self.case / ".kin" / "write.lock"

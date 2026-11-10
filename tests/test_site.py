@@ -72,7 +72,8 @@ class TestTreeData(unittest.TestCase):
             for key in ("persons", "edges", "claims", "arts", "gens", "lines", "families", "feedback", "meta"):
                 self.assertIn(key, priv)
             edges = {e["id"]: e for e in priv["edges"]}
-            self.assertEqual(edges["R-0005"]["lv"], "doc2")          # Сомов → Мария: две группы
+            self.assertEqual(edges["R-0006"]["lv"], "doc2")          # Сергей → Анна: две группы
+            self.assertEqual(edges["R-0005"]["lv"], "doc1")          # Сомов → Мария: рассказ о прапрадеде не засчитан
             self.assertEqual(edges["C-0008"]["t"], "identity")       # «возможно, одно лицо» из утверждения
             self.assertEqual(edges["C-0009"]["lv"], "research")      # гипотеза отцовства
             self.assertIn("Ветлугин", {f["key"] for f in priv["families"]})

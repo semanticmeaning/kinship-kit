@@ -138,13 +138,15 @@ def main() -> None:
     claim("--type", "parentage", "--subject", "P-0009;P-0001", "--statement", "Kuzma Vetlugin is the father of Ivan Kuzmich",
           "--status", "hypothesis", "--rationale", "Inferred only from the patronymic 'Kuzmin'")              # C-0009
     claim("--type", "parentage", "--subject", "P-0010;P-0003", "--statement", "Fyodor Somov is the father of Maria Fyodorovna",
-          "--sources", "A-0003;A-0009", "--status", "corroborated",
-          "--rationale", "1910 marriage record ('daughter of Fyodor Somov') and an independent family story")  # C-0010
+          "--sources", "A-0003;A-0009", "--status", "single-source",
+          "--rationale", "1910 marriage record ('daughter of Fyodor Somov'). A family story about a great-great-grandfather does not "
+          "count as independent: family information counts only for living people and one generation from them")  # C-0010
     claim("--type", "birth", "--subject", "P-0001", "--statement", "Ivan Kuzmich was born about 1855",
           "--date", "1855~", "--sources", "A-0010", "--mentions", "M-0005", "--status", "single-source",
           "--rationale", "Aged 3 in the 1858 revision list")                                                  # C-0011
     claim("--type", "parentage", "--subject", "P-0004;P-0005", "--statement", "Sergei Petrovich is the father of Anna Sergeevna",
-          "--sources", "A-0011", "--status", "single-source")                                                 # C-0012
+          "--sources", "A-0011;A-0012", "--status", "corroborated",
+          "--rationale", "1952 birth certificate and the author's questionnaire: family information counts for a living person's father")  # C-0012
 
     def rel(*a):
         return kin(case, "rel", "add", *a)
@@ -153,9 +155,9 @@ def main() -> None:
     rel("P-0002", "spouse-of", "P-0003", "--claims", "C-0004", "--status", "single-source")
     rel("P-0002", "parent-of", "P-0004", "--claims", "C-0006", "--status", "single-source", "--nature", "biological")
     rel("P-0003", "parent-of", "P-0004", "--sources", "A-0006", "--status", "single-source", "--nature", "biological")
-    rel("P-0010", "parent-of", "P-0003", "--claims", "C-0010", "--status", "corroborated",
-        "--rationale", "Two independent groups: marriage record and family story")
-    rel("P-0004", "parent-of", "P-0005", "--claims", "C-0012", "--status", "single-source")
+    rel("P-0010", "parent-of", "P-0003", "--claims", "C-0010", "--status", "single-source")
+    rel("P-0004", "parent-of", "P-0005", "--claims", "C-0012", "--status", "corroborated",
+        "--rationale", "Two independent groups: birth certificate and the author's questionnaire")
     rel("P-0005", "parent-of", "P-0006", "--sources", "A-0012", "--status", "single-source")
 
     def add(reg, *a):

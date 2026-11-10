@@ -25,7 +25,7 @@ def run(*args, case: Path | None = None, ok: bool = True) -> subprocess.Complete
     cmd = [sys.executable, str(KIN), *args]
     if case is not None:
         cmd += ["--case", str(case)]
-    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", stdin=subprocess.DEVNULL)  # kin не ждёт ввода
     if ok and res.returncode != 0:
         raise AssertionError(f"kin {' '.join(args)} → {res.returncode}\n{res.stdout}\n{res.stderr}")
     return res

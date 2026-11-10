@@ -137,22 +137,24 @@ def main() -> None:
     C("--type", "parentage", "--subject", "P-0009;P-0001", "--statement", "Кузьма Ветлугин — отец Ивана Кузьмича",
       "--status", "hypothesis", "--rationale", "Выведено только из отчества «Кузьмин»")                          # C-0009
     C("--type", "parentage", "--subject", "P-0010;P-0003", "--statement", "Фёдор Сомов — отец Марии Фёдоровны",
-      "--sources", "A-0003;A-0009", "--status", "corroborated",
-      "--rationale", "Метрика брака 1910 («Федора Сомова дочь») и независимый рассказ семьи")                    # C-0010
+      "--sources", "A-0003;A-0009", "--status", "single-source",
+      "--rationale", "Метрика брака 1910 («Федора Сомова дочь»). Рассказ семьи о прапрадеде не засчитывается как независимое "
+      "подтверждение: семейные сведения — только о живых и на одно поколение от них")                    # C-0010
     C("--type", "birth", "--subject", "P-0001", "--statement", "Иван Кузьмич родился около 1855 г.",
       "--date", "1855~", "--sources", "A-0010", "--mentions", "M-0005", "--status", "single-source",
       "--rationale", "Возраст 3 года в РС 1858")                                                                  # C-0011
     C("--type", "parentage", "--subject", "P-0004;P-0005", "--statement", "Сергей Петрович — отец Анны Сергеевны",
-      "--sources", "A-0011", "--status", "single-source")                                                       # C-0012
+      "--sources", "A-0011;A-0012", "--status", "corroborated",
+      "--rationale", "Свидетельство о рождении 1952 и анкета автора: об отце живого человека семейные сведения засчитываются")  # C-0012
 
     R = lambda *a: kin(case, "rel", "add", *a)  # noqa: E731
     R("P-0001", "parent-of", "P-0002", "--claims", "C-0007", "--status", "single-source", "--nature", "biological")
     R("P-0002", "spouse-of", "P-0003", "--claims", "C-0004", "--status", "single-source")
     R("P-0002", "parent-of", "P-0004", "--claims", "C-0006", "--status", "single-source", "--nature", "biological")
     R("P-0003", "parent-of", "P-0004", "--sources", "A-0006", "--status", "single-source", "--nature", "biological")
-    R("P-0010", "parent-of", "P-0003", "--claims", "C-0010", "--status", "corroborated",
-      "--rationale", "Две независимые группы: метрика брака и рассказ семьи")
-    R("P-0004", "parent-of", "P-0005", "--claims", "C-0012", "--status", "single-source")
+    R("P-0010", "parent-of", "P-0003", "--claims", "C-0010", "--status", "single-source")
+    R("P-0004", "parent-of", "P-0005", "--claims", "C-0012", "--status", "corroborated",
+      "--rationale", "Две независимые группы: свидетельство о рождении и анкета автора")
     R("P-0005", "parent-of", "P-0006", "--sources", "A-0012", "--status", "single-source")
 
     A = lambda reg, *a: kin(case, "add", reg, *a)  # noqa: E731
