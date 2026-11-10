@@ -392,6 +392,7 @@ def _choice(*allowed):
 
 CASE_KEYS = {"title": str, "language": str, "root_person": str, "privacy.living_cutoff_years": int,
              "privacy.public_living": _choice("hide", "allow"), "privacy.on_leak": _choice("fail", "redact"),
+             "privacy.public_stories": _choice("deny", "allow"),
              "feedback.enabled": _bool, "feedback.max_per_day": int, "feedback.max_chars": int,
              "feedback.per_ip_per_hour": int}
 LINE_FIELDS = ("id", "title", "surname", "state", "where", "focus", "color")

@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -36,7 +37,9 @@ SURN = re.compile(r"(ов|ев|ёв|ин|ын|ский|цкий|ова|ева|ё
 
 
 def clean_name(label: str) -> str:
-    s = re.sub(r"\s*\((?=[а-яёa-z\d])[^)]*\)", "", label.split(",")[0])  # пометки в скобках; девичью «(Сомова)» оставить
+    """Имя для схемы: без пометок в скобках (девичью «(Сомова)» оставить) и без пояснения после « — » или запятой."""
+    s = re.split(r"\s+—\s+", label)[0].split(",")[0]
+    s = re.sub(r"\s*\((?=[а-яёa-z\d])[^)]*\)", "", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -76,6 +79,96 @@ DEFAULT_LINE_COLOR = "#8a7f6d"
 def _color(value) -> str:
     """Цвет линии — только #hex: case.json можно править вручную, а значение попадает в атрибут style страницы."""
     return value if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{3,8}", value) else DEFAULT_LINE_COLOR
+
+
+PHOTO_KINDS = {".jpg", ".jpeg", ".png", ".webp"}
+POT_ID = re.compile(r"^[A-Za-z][A-Za-z0-9-]{0,40}$")
+
+
+def _warn(text: str) -> None:
+    print(f"предупреждение: {text}", file=sys.stderr)
+
+
+def _stories(case: Case, visible: set, public: bool, h) -> dict:
+    """Рассказы: stories/P-….md в папке дела (абзацы через пустую строку; необязательная шапка --- … ---).
+    В публичную версию — только по решению автора (privacy.public_stories=allow); утечки ловит проверка сборки."""
+    out = {}
+    if public and case.config.get("privacy", {}).get("public_stories") != "allow":
+        return out
+    for f in sorted((case.root / "stories").glob("P-*.md")):
+        raw = f.read_text(encoding="utf-8")
+        h.update(raw.encode())
+        m = re.match(r"^---\n(.*?)\n---\n", raw, re.S)
+        head, body = (m.group(1), raw[m.end():]) if m else ("", raw)
+        m = re.search(r"person_id:\s*(P-\d+)", head)
+        pid = case.resolve_person(m.group(1) if m else f.stem)
+        paras = [re.sub(r"\s*\n\s*", " ", t).strip() for t in re.split(r"\n\s*\n", body) if t.strip()]
+        if pid in visible and paras:
+            out[pid] = paras
+    return out
+
+
+def _portraits(case: Case, visible: set, public: bool, reg_arts: dict, manifest: list) -> dict:
+    """Портреты: case.json → site.portraits {"P-…": {"artifact": "A-…", "crop": "x0,y0,x1,y1"}} (доли кадра, лицо).
+    Файл — источник дела (фото); в публичной версии — только при scan_publication=allow, как и документы."""
+    out = {}
+    for pid0, spec in sorted((case.config.get("site", {}).get("portraits") or {}).items()):
+        pid = case.resolve_person(pid0)
+        spec = spec if isinstance(spec, dict) else {}
+        aid, a = spec.get("artifact", ""), reg_arts.get(spec.get("artifact", ""), {})
+        f = (case.root / a["file"]).resolve() if a.get("file") else None
+        if pid not in visible:
+            continue
+        if not f or case.root / "sources" not in f.parents or not f.is_file() or f.suffix.lower() not in PHOTO_KINDS:
+            _warn(f"site.portraits {pid0}: {aid or '—'} — нужен источник-изображение (jpg, png, webp) из sources/")
+            continue
+        if public and a.get("scan_publication") != "allow":
+            continue
+        crop = None
+        if spec.get("crop"):
+            try:
+                crop = [float(x) for x in str(spec["crop"]).split(",")]
+                assert len(crop) == 4 and 0 <= crop[0] < crop[2] <= 1 and 0 <= crop[1] < crop[3] <= 1
+            except (ValueError, AssertionError):
+                _warn(f"site.portraits {pid0}: crop — «x0,y0,x1,y1» в долях кадра (0…1)")
+                crop = None
+        name = f"photos/{aid}{f.suffix.lower()}"
+        if (f, name) not in manifest:
+            manifest.append((f, name))
+        out[pid] = {"f": name, "crop": crop}
+    return out
+
+
+def _versions(case: Case, visible: set) -> dict:
+    """Рамки версий: case.json → site.versions {version_groups, marriage_order, rank} (решение автора).
+    Группа, где есть невидимый в этой версии человек, не выводится целиком — скрытые не раскрываются через рамки."""
+    cfg = case.config.get("site", {}).get("versions") or {}
+    seen = lambda ids: all(case.resolve_person(i) in visible for i in ids)  # noqa: E731
+    groups = []
+    for g in cfg.get("version_groups") or []:
+        try:
+            members = [i for v in g["versions"] for i in v]
+            pot = g.get("pot")
+            if pot:
+                assert POT_ID.match(pot["id"]) and pot["of"] in members and pot.get("sex", "U") in ("M", "F", "U")
+                pot = {"id": pot["id"], "of": pot["of"], "sex": pot.get("sex", "U"), "role": str(pot.get("role", ""))[:20]}
+            real = [i for i in members if not (pot and i == pot["id"])]
+            ids = list(g["slot"]) + real + list(g.get("after") or [])
+        except (KeyError, TypeError, AssertionError):
+            _warn("site.versions: группа версий не разобрана — нужны slot, versions, необязательно pot {id, of, sex, role} и after")
+            continue
+        missing = [i for i in ids if i not in case.index("persons")]
+        if missing:
+            _warn(f"site.versions: нет людей {', '.join(missing)}")
+            continue
+        if seen(ids):
+            groups.append({"slot": list(g["slot"]), "versions": [list(v) for v in g["versions"]],
+                           **({"pot": pot} if pot else {}), "after": list(g.get("after") or [])})
+    order = {k: [x for x in v if case.resolve_person(x) in visible]
+             for k, v in (cfg.get("marriage_order") or {}).items() if case.resolve_person(k) in visible and isinstance(v, list)}
+    rank = {k: int(v) for k, v in (cfg.get("rank") or {}).items()
+            if case.resolve_person(k) in visible and isinstance(v, int) and 0 <= v <= 3}
+    return {"groups": groups, "marriage_order": order, "rank": rank}
 
 
 def build(case: Case, profile: str, pub: dict) -> tuple[dict, list[tuple[Path, str]]]:
@@ -368,6 +461,19 @@ def build(case: Case, profile: str, pub: dict) -> tuple[dict, list[tuple[Path, s
     for name in ("persons", "claims", "relationships", "artifacts"):
         h.update(case.path(name).read_bytes())
     h.update(json.dumps(case.config.get("lines", []), sort_keys=True, ensure_ascii=False).encode())
+    h.update(json.dumps(case.config.get("site", {}), sort_keys=True, ensure_ascii=False).encode())
+
+    # --- рассказы, портреты, рамки версий (решения автора дела)
+    stories = _stories(case, visible, public, h)
+    portraits = _portraits(case, visible, public, reg_arts, manifest)
+    versions = _versions(case, visible)
+    for x in persons:
+        if x["id"] in stories:
+            x["story"] = stories[x["id"]]
+        if x["id"] in portraits:
+            x["photo"] = portraits[x["id"]]
+        if x["id"] in versions["rank"]:
+            x["rank"] = versions["rank"][x["id"]]
     schema, change = _git_change(case, public)
     asof = max((a.get("captured_at", "")[:10] for a in reg_arts.values() if a.get("captured_at")), default="")
     living_shown = not public or case.config.get("privacy", {}).get("public_living") == "allow"
@@ -376,5 +482,6 @@ def build(case: Case, profile: str, pub: dict) -> tuple[dict, list[tuple[Path, s
                      "language": lang, "feedback": bool(pub["meta"].get("feedback")),
                      "hidden_persons": pub["meta"].get("hidden_persons"), "aliases": sorted(aliases.items())},
             "lines": lines, "gens": gens, "persons": persons, "edges": edges, "claims": out_claims,
-            "arts": arts_out, "feedback": fb_items, "families": families}
+            "arts": arts_out, "feedback": fb_items, "families": families,
+            "versions": {"groups": versions["groups"], "marriage_order": versions["marriage_order"]}}
     return data, manifest
