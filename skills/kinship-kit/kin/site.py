@@ -9,6 +9,8 @@ import contextlib
 import functools
 import http.server
 import json
+import os
+import re
 import shutil
 import sys
 from collections import deque
@@ -158,6 +160,11 @@ def build(case: Case, profile: str = "private") -> Path:
         (out / f"index.{lang}.html").write_text(text, encoding="utf-8")
     default = case.config.get("language", "ru")
     (out / "index.html").write_text(versions.get(default, html), encoding="utf-8")
+    if (WEB / "fonts").is_dir():  # шрифт страницы (Inter, SIL OFL 1.1) — свой, без обращения к внешним сайтам
+        (out / "fonts").mkdir(exist_ok=True)
+        for f in (WEB / "fonts").iterdir():
+            if f.is_file() and f.suffix.lower() in (".woff2", ".css", ".txt"):
+                shutil.copyfile(f, out / "fonts" / f.name)
     for icons in (WEB / "icons", theme / "icons"):  # иконки страницы (пол на карточках); своя тема может их заменить
         if icons.is_dir():
             (out / "icons").mkdir(exist_ok=True)
@@ -179,7 +186,8 @@ def build(case: Case, profile: str = "private") -> Path:
     if problems:
         shutil.rmtree(out)
         raise KinError("Сайт не собран — утечки в сборке:\n- " + "\n- ".join(problems))
-    for line in check_layout(out):  # раскладка на этих данных: пустые координаты, наложения, ошибки скрипта
+    # раскладка на этих данных: линии под карточками, наложения, ошибки панели (KIN_SKIP_LAYOUT_CHECK=1 — без неё)
+    for line in ([] if os.environ.get("KIN_SKIP_LAYOUT_CHECK") == "1" else check_layout(out)):
         print(line, file=sys.stderr)
     if (theme / "index.html").is_file():
         print("примечание: своя страница дела (theme/index.html) не проверяется автоматически — раскладка проверена "
@@ -187,22 +195,83 @@ def build(case: Case, profile: str = "private") -> Path:
     return out
 
 
-def check_layout(out: Path, page: Path | None = None) -> list[str]:
-    """Прогнать код страницы на собранных данных (node): обычный вид, фильтры семей, раскрытия родни.
-    Выполняется ТОЛЬКО страница из набора (page — для тестов набора): скрипт страницы в node работает с правами
-    пользователя, а theme/index.html приходит вместе с делом и может быть чужим. Из дела берутся только данные tree.json.
-    Возвращает строки «предупреждение: …»; пустой список — всё в порядке или node нет (тогда — одна строка-пояснение)."""
-    import shutil as _sh
+CHROME_PATHS = ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "/Applications/Chromium.app/Contents/MacOS/Chromium",
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                "/opt/google/chrome/chrome")
+
+
+def find_chrome() -> str | None:
+    for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome", "msedge"):
+        if shutil.which(name):
+            return shutil.which(name)
+    return next((p for p in CHROME_PATHS if Path(p).is_file()), None)
+
+
+def layout_probe(out: Path, query: str, page: Path | None = None) -> dict | None:
+    """Открыть страницу в headless Chrome на собранных данных и вернуть итог её самопроверки (?check=1 → <pre id="chk">,
+    ?pcheck=1 → <pre id="pchk">). Выполняется ТОЛЬКО страница из набора (page — для тестов набора): theme/index.html
+    приходит вместе с делом и может быть чужим; из дела берётся только tree.json. None — Chrome нет или страница не собралась."""
+    import html as htmllib
     import subprocess
-    node = _sh.which("node")
-    if not node:
-        return ["примечание: node не найден — раскладка сайта не проверена (kin работает и без него)"]
+    import tempfile
+    import threading
+    chrome = find_chrome()
+    if not chrome:
+        return None
+    with tempfile.TemporaryDirectory(prefix="kin-layout.") as tmp:
+        root = Path(tmp) / "site"
+        root.mkdir()
+        shutil.copyfile(page or WEB / "index.html", root / "index.html")
+        shutil.copyfile(out / "tree.json", root / "tree.json")
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(root)))
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            cmd = [chrome, "--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars", f"--user-data-dir={tmp}/profile",
+                   "--window-size=1440,1000", "--virtual-time-budget=12000", "--dump-dom",
+                   f"http://127.0.0.1:{srv.server_address[1]}/index.html?{query}"]
+            if hasattr(os, "geteuid") and os.geteuid() == 0:
+                cmd.insert(1, "--no-sandbox")  # под root Chrome без этого не запускается; выполняется только страница набора
+            try:
+                res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+                                     stdin=subprocess.DEVNULL)
+            except (OSError, subprocess.TimeoutExpired):
+                return None
+        finally:
+            srv.shutdown()
+            srv.server_close()
+    pre = "pchk" if "pcheck" in query else "chk"
+    m = re.search(rf'<pre id="{pre}"[^>]*>(.*?)</pre>', res.stdout, re.S)
     try:
-        res = subprocess.run([node, str(WEB / "check_layout.js"), str(page or WEB / "index.html"), str(out / "tree.json")],
-                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return [f"предупреждение: проверка раскладки не выполнилась — {e}"]
-    return [] if res.returncode == 0 else [line for line in res.stdout.splitlines() if line.strip()]
+        return json.loads(htmllib.unescape(m.group(1))) if m else None
+    except ValueError:
+        return None
+
+
+def check_layout(out: Path, page: Path | None = None) -> list[str]:
+    """Раскладка сайта на собранных данных в headless Chrome: линии под карточками, наложения, ошибки панели у каждого
+    человека, люди вне разрешённого режимом. Строки «предупреждение: …»; пустой список — всё в порядке."""
+    if not find_chrome():
+        return ["примечание: Chrome/Chromium не найден — раскладка сайта не проверена (kin работает и без него)"]
+    warn = []
+    for query in ("check=1", "check=1&all=1", "check=1&mode=conf"):
+        c = layout_probe(out, query, page)
+        if c is None:
+            warn.append(f"проверка раскладки «{query}» не выполнилась — страница не собралась")
+            continue
+        for key, name in (("under", "линии под карточками"), ("overlap", "наложения линий")):
+            # в режиме «Только подтверждённые» соединители супругов и семей начинаются под краем карточки — так рисует
+            # раскладка, на виде не сказывается; здесь проверяется только, что режим не показал лишних людей
+            if c.get(key) and "mode=conf" not in query:
+                warn.append(f"{name}: {c[key]} ({query}), например {json.dumps(c.get(key + 'Ex', [])[:3], ensure_ascii=False)}")
+        if c.get("notAllowed"):
+            warn.append(f"показаны люди, не разрешённые режимом ({query}): {', '.join(c['notAllowed'][:5])}")
+    c = layout_probe(out, "pcheck=1", page)
+    if c and c.get("err"):
+        warn.append(f"ошибки панели: {len(c['err'])}, например {c['err'][:2]}")
+    return [f"предупреждение: {w}" for w in warn]
 
 
 class _Quiet(http.server.SimpleHTTPRequestHandler):

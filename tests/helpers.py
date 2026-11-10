@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,8 @@ REPO = Path(__file__).resolve().parent.parent
 SKILL = REPO / "skills" / "kinship-kit"
 KIN = SKILL / "kin.py"
 sys.path.insert(0, str(SKILL))
+# сборки сайта в тестах — без проверки раскладки в Chrome (долго); её проверяют отдельные тесты (test_site.TestLayoutCheck)
+os.environ.setdefault("KIN_SKIP_LAYOUT_CHECK", "1")
 
 # вывод тестов — в UTF-8, как у самого kin (cli.main): в Windows консоль по умолчанию в cp1252/cp1251,
 # и print русского текста из кода набора внутри теста (например, сервер в потоке) падал бы

@@ -152,6 +152,23 @@ class TestSiteLanguages(Base):
         self.assertIn(">EN<", ru)
         self.assertEqual(default, ru)  # язык дела — ru
 
+    def test_english_page_code_has_no_russian_strings(self):
+        """Весь интерфейс в английской версии переведён: русскими остаются только сравнения с данными дела
+        (они на языке реестров) и кнопка «Русская версия»."""
+        import re
+        web = REPO / "skills" / "kinship-kit" / "kin" / "web"
+        html = (web / "index.html").read_text(encoding="utf-8")
+        for a, b in json.loads((web / "i18n-en.json").read_text(encoding="utf-8")):
+            html = html.replace(a, b)
+        code = re.sub(r"<!--.*?-->|/\*.*?\*/", "", html, flags=re.S)
+        code = re.sub(r"(?m)(^|[^:'\"`\\])//[^\n]*", r"\1", code)
+        data_words = ["Русская версия", "дата неизв.", "расторгнут", "овдове", "ждём", "ищем", "род\\.", "За:", "Против",
+                      ".st-проверяем", ".st-подтверждено", ".st-принято", ".st-не", "/ё/g", "'е'"]
+        for w in data_words:
+            code = code.replace(w, "")
+        left = sorted({m.group(0) for m in re.finditer(r"[А-Яа-яЁё][^<>`'\"{}]*", code)})
+        self.assertEqual(left, [], "добавьте перевод в kin/web/i18n-en.json")
+
     def test_english_page_has_no_russian_ui(self):
         import html as htmllib
         import re
@@ -165,79 +182,147 @@ class TestSiteLanguages(Base):
                            capture_output=True)
             run("site", "build", case=case)
             page = case / "site" / "private" / "index.en.html"
-            dom = subprocess.run([chrome, "--headless=new", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=5000",
-                                  f"--user-data-dir={tmp}/chrome", "--allow-file-access-from-files", "--dump-dom",
-                                  page.as_uri() + "#P-0002"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120).stdout
-            dom = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", dom, flags=re.S)
-            text = htmllib.unescape(re.sub(r"<[^>]+>", " ", dom)) + " " + " ".join(re.findall(r'(?:title|aria-label|placeholder)="([^"]*)"', dom))
-            self.assertIn("Facts", text)  # профиль отрисован
-            russian = sorted({x.strip() for x in re.findall(r"[А-Яа-яЁё][А-Яа-яЁё ]*", text)} - {"Русская версия"})
-            self.assertEqual(russian, [])
+            for query, marker in (("#P-0002", "Life"), ("?ptab=research#P-0002", "Search progress"), ("", "What is known")):
+                cmd = [chrome, "--headless=new", "--disable-gpu", "--virtual-time-budget=5000", f"--user-data-dir={tmp}/chrome",
+                       "--allow-file-access-from-files", "--dump-dom", page.as_uri() + query]
+                if hasattr(os, "geteuid") and os.geteuid() == 0:
+                    cmd.insert(1, "--no-sandbox")
+                dom = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120).stdout
+                dom = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", dom, flags=re.S)
+                text = htmllib.unescape(re.sub(r"<[^>]+>", " ", dom)) + " " + " ".join(re.findall(r'(?:title|aria-label|placeholder)="([^"]*)"', dom))
+                self.assertIn(marker, text, query)  # панель отрисована
+                russian = sorted({x.strip() for x in re.findall(r"[А-Яа-яЁё][А-Яа-яЁё ]*", text)} - {"Русская версия"})
+                self.assertEqual(russian, [], query)
             unlock(case)
 
 
+class TestDesignData(Base):
+    """Данные нового дизайна: рассказы, портреты, рамки версий, шрифт — и что из них попадает в публичную версию."""
+
+    def config(self, **site):
+        cfg_path = self.case / "case.json"
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        cfg.setdefault("site", {}).update(site)
+        cfg_path.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+
+    def tree(self, profile="private"):
+        res = self.kin("site", "build", "--profile", profile)
+        return json.loads((self.case / "site" / profile / "tree.json").read_text(encoding="utf-8")), res
+
+    def person_in(self, data, pid):
+        return next(x for x in data["persons"] if x["id"] == pid)
+
+    def test_stories_private_by_default(self):
+        p = self.person("Ветлугин Сергей — сын Петра", "deceased", "identity-confirmed", "--birth", "1921")
+        (self.case / "stories").mkdir()
+        (self.case / "stories" / f"{p}.md").write_text("Работал в колхозе.\n\nВоевал с 1941 года.\n", encoding="utf-8")
+        data, _ = self.tree()
+        me = self.person_in(data, p)
+        self.assertEqual(me["story"], ["Работал в колхозе.", "Воевал с 1941 года."])
+        self.assertEqual(me["name"], "Ветлугин Сергей")                     # пояснение после « — » не в имени
+        pub, _ = self.tree("public")
+        self.assertNotIn("story", self.person_in(pub, p))                  # рассказы — только по решению автора
+        self.kin("case", "set", "privacy.public_stories=allow")
+        pub, _ = self.tree("public")
+        self.assertIn("story", self.person_in(pub, p))
+        self.assertTrue((self.case / "site" / "public" / "fonts" / "inter.css").is_file())
+        self.assertTrue((self.case / "site" / "public" / "fonts" / "OFL.txt").is_file())
+
+    def test_portrait_needs_publication_permission(self):
+        photo = Path(self.tmp.name) / "portret.png"
+        photo.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 64)
+        aid = json.loads(self.kin("source", "add", str(photo), "--title", "Фото", "--kind", "photo", "--group", "ph", "--json").stdout)["artifact_id"]
+        p = self.person("Ветлугин Сергей", "deceased", "identity-confirmed", "--birth", "1921")
+        self.config(portraits={p: {"artifact": aid, "crop": "0.1,0.1,0.6,0.7"}, "P-9999": {"artifact": aid}})
+        data, res = self.tree()
+        self.assertEqual(self.person_in(data, p)["photo"], {"f": f"photos/{aid}.png", "crop": [0.1, 0.1, 0.6, 0.7]})
+        self.assertTrue((self.case / "site" / "private" / "photos" / f"{aid}.png").is_file())
+        pub, _ = self.tree("public")
+        self.assertNotIn("photo", self.person_in(pub, p))                   # без scan_publication=allow
+        self.assertFalse((self.case / "site" / "public" / "photos").exists())
+        self.config(portraits={p: {"artifact": aid, "crop": "2,0,1,1"}})
+        data, res = self.tree()
+        self.assertIsNone(self.person_in(data, p)["photo"]["crop"])
+        self.assertIn("crop", res.stderr)
+
+    def test_version_frames_hide_groups_with_hidden_people(self):
+        a = self.add_source("svid", group="g1")
+        dad = self.person("Ветлугин Пётр", "deceased", "identity-confirmed", "--birth", "1885")
+        v1 = self.person("Ветлугин Иван", "deceased", "candidate", "--birth", "1910")
+        v2 = self.person("Ветлугин Иван Петрович", "deceased", "candidate", "--birth", "1911")
+        alive = self.person("Ветлугина Анна", "living", "identity-confirmed", "--birth", "1952")
+        self.kin("rel", "add", dad, "parent-of", alive, "--sources", a, "--status", "single-source")
+        self.config(versions={"version_groups": [
+            {"slot": [dad], "versions": [[v1], [v2]]},
+            {"slot": [dad], "versions": [[v1], [alive]]},
+            {"slot": [dad], "versions": [[v1, "POT-1"]], "pot": {"id": "<script>", "of": v1}}],
+            "marriage_order": {dad: [alive, v1]}, "rank": {v1: 2, v2: 9}})
+        data, res = self.tree()
+        self.assertEqual(len(data["versions"]["groups"]), 2)                # группа с плохим pot отброшена
+        self.assertIn("site.versions", res.stderr)
+        self.assertEqual(self.person_in(data, v1)["rank"], 2)
+        self.assertNotIn("rank", self.person_in(data, v2))                 # ранг только 0…3
+        pub, _ = self.tree("public")
+        groups = pub["versions"]["groups"]
+        self.assertEqual([g["versions"] for g in groups], [[[v1], [v2]]])  # группа с живым скрыта целиком
+        self.assertEqual(pub["versions"]["marriage_order"], {dad: [v1]})
+        self.assertNotIn(alive, json.dumps(pub["versions"]))
+
+
 class TestLayoutCheck(Base):
+    """Раскладка проверяется в headless Chrome самопроверкой страницы (?check=1, ?pcheck=1); без Chrome — пропуск."""
+
+    def setUp(self):
+        super().setUp()
+        sys.path.insert(0, str(REPO / "skills" / "kinship-kit"))
+        from kin import site as site_mod
+        self.site = site_mod
+        if not site_mod.find_chrome():
+            self.skipTest("нужен Chrome или Chromium")
+
     def test_many_unlinked_people_still_laid_out(self):
         """70 человек без связей: раньше раскладка оставляла пустые координаты и схема была пустой."""
-        import shutil as sh
-        if not sh.which("node"):
-            self.skipTest("нужен node")
         for i in range(70):
             self.kin("person", "add", "--label", f"Одиночкин Кандидат{i}", "--living", "deceased", "--status", "candidate",
                      "--birth", str(1850 + i))
         root = self.person("Корнев Корень", "deceased", "identity-confirmed", "--birth", "1950")
         self.kin("case", "set", f"root_person={root}")
-        res = self.kin("site", "build")
+        with mock.patch.dict(os.environ, {"KIN_SKIP_LAYOUT_CHECK": "0"}):
+            res = self.kin("site", "build")
         self.assertNotIn("предупреждение", res.stderr)
-        sys.path.insert(0, str(REPO / "skills" / "kinship-kit"))
-        from kin import site as site_mod
         out = self.case / "site" / "private"
-        self.assertEqual(site_mod.check_layout(out), [])
-        # и английская версия страницы тоже
-        res = subprocess.run(["node", str(REPO / "skills/kinship-kit/kin/web/check_layout.js"), str(out / "index.en.html"),
-                              str(out / "tree.json")], capture_output=True, text=True, encoding="utf-8", errors="replace")
-        self.assertEqual(res.returncode, 0, res.stdout)
+        self.assertEqual(self.site.check_layout(out, page=out / "index.en.html"), [])  # и английская версия
 
-    def test_theme_page_script_is_not_run_in_node(self):
-        """Проверка раскладки выполняет в node только страницу набора: theme/index.html приходит с делом и может быть чужим."""
-        import shutil as sh
-        if not sh.which("node"):
-            self.skipTest("нужен node")
-        sys.path.insert(0, str(REPO / "skills" / "kinship-kit"))
-        from kin import site as site_mod
+    def test_theme_page_is_not_run_in_layout_check(self):
+        """Проверка раскладки выполняет только страницу набора: theme/index.html приходит с делом и может быть чужим."""
         self.person("Ветлугин Сергей")
-        marker = Path(self.tmp.name) / "marker.txt"
-        # путь — из окружения, не из текста страницы: локальный путь в странице остановила бы проверка утечек
-        probe = ("(process.getBuiltinModule ? process.getBuiltinModule('fs') : process.mainModule.require('fs'))"
-                 ".writeFileSync(process.env.KIN_TEST_MARKER, 'x');")
         theme = self.case / "theme"
         theme.mkdir()
-        page = (site_mod.WEB / "index.html").read_text(encoding="utf-8").replace("<script>", "<script>" + probe, 1)
+        fake = "<pre id=\"chk\">{&quot;under&quot;: 777, &quot;underEx&quot;: [[&quot;ТЕМА&quot;]]}</pre>"
+        page = (self.site.WEB / "index.html").read_text(encoding="utf-8").replace("<body>", "<body>" + fake, 1)
         (theme / "index.html").write_text(page, encoding="utf-8")
-        with mock.patch.dict(os.environ, {"KIN_TEST_MARKER": str(marker)}):
+        with mock.patch.dict(os.environ, {"KIN_SKIP_LAYOUT_CHECK": "0"}):
             res = self.kin("site", "build")
-            self.assertFalse(marker.exists(), "скрипт страницы дела выполнился в node")
-            self.assertIn("theme/index.html", res.stderr)
-            # зонд рабочий: выполненная напрямую, такая страница создала бы файл
-            site_mod.check_layout(self.case / "site" / "private", page=theme / "index.html")
-        self.assertTrue(marker.exists())
+        self.assertNotIn("ТЕМА", res.stderr)
+        self.assertIn("theme/index.html", res.stderr)
+        # зонд рабочий: выполненная напрямую, такая страница дала бы подставной итог
+        self.assertTrue(any("ТЕМА" in w for w in self.site.check_layout(self.case / "site" / "private", page=theme / "index.html")))
 
     def test_display_modes_nest_and_confirmed_hides_candidates(self):
         """«Только подтверждённые» ⊂ «Гипотезы поиска» ⊂ «Показать отброшенное»; кандидаты и гипотезы — не в первом режиме."""
-        import shutil as sh
-        if not sh.which("node"):
-            self.skipTest("нужен node")
         real = self.person("Ветлугин Сергей", "deceased", "identity-confirmed", "--birth", "1921")
         hyp = self.person("Ветлугин Кандидат", "deceased", "hypothesis", "--birth", "1890")
         cand = self.person("Ветлугин Возможный", "deceased", "candidate", "--birth", "1891")
         off = self.person("Ветлугин Отброшенный", "deceased", "unlikely", "--birth", "1892")
         self.kin("case", "set", f"root_person={real}")
         self.kin("site", "build")
-        web = REPO / "skills" / "kinship-kit" / "kin" / "web"
-        res = subprocess.run(["node", str(web / "check_layout.js"), str(web / "index.html"), str(self.case / "site" / "private" / "tree.json"), "--modes"],
-                             capture_output=True, text=True, encoding="utf-8", errors="replace")
-        self.assertEqual(res.returncode, 0, res.stdout)
-        modes = {k: set(v) for k, v in json.loads(res.stdout.splitlines()[-1]).items()}
+        out = self.case / "site" / "private"
+        modes = {}
+        for m in ("conf", "hyp", "rej"):
+            c = self.site.layout_probe(out, f"check=1&all=1&lonely=1&mode={m}")
+            self.assertIsNotNone(c, m)
+            self.assertEqual(c["notAllowed"], [], m)
+            modes[m] = {x for x in c["vis"] if x.startswith("P-")}
         self.assertIn(real, modes["conf"])
         self.assertFalse({hyp, cand, off} & modes["conf"])
         self.assertLessEqual(modes["conf"], modes["hyp"])
@@ -260,36 +345,40 @@ console.log(JSON.stringify(viewable([{ a: 'A-1', f: ['p.html.txt'] }, { a: 'A-2'
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(json.loads(res.stdout), [{"a": "A-2", "f": ["p.htm.txt"]}, {"a": "A-3", "f": ["s.jpg", "note.txt"]}])
 
-    def test_card_splits_facts_hypotheses_and_hides_refuted(self):
+    def test_person_panel_sections(self):
+        """Вкладка «Гипотезы»: подтверждённые факты отдельно, опровергнутое — в «Ход поиска → Отброшенные версии»."""
+        import html as htmllib
         import re
-        import shutil as sh
-        chrome = next((p for p in (sh.which("google-chrome"), "/opt/google/chrome/chrome") if p and Path(p).exists()), None)
-        if not chrome:
-            self.skipTest("нужен Chrome")
         a1, a2 = self.add_source("svid", group="g1"), self.add_source("spravka", group="g2")
         p = self.person("Ветлугин Сергей", "deceased", "identity-confirmed", "--birth", "1921")
+        self.kin("case", "set", f"root_person={p}")
         self.kin("claim", "add", "--type", "birth", "--subject", p, "--statement", "Родился в Кленовке", "--sources", a1, "--status", "single-source")
-        self.kin("claim", "add", "--type", "residence", "--subject", p, "--statement", "Возможно, жил в Заречье", "--status", "hypothesis")
-        self.kin("claim", "add", "--type", "residence", "--subject", p, "--statement", "Жил в Озерках", "--sources", a2, "--status", "rejected", "--rationale", "другой человек")
+        self.kin("claim", "add", "--type", "residence", "--subject", p, "--statement", "Жил в Озерках", "--sources", a2,
+                 "--status", "rejected", "--rationale", "другой человек")
         self.kin("site", "build")
-        dom = subprocess.run([chrome, "--headless=new", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=5000",
-                              f"--user-data-dir={self.tmp.name}/chrome", "--allow-file-access-from-files", "--dump-dom",
-                              (self.case / "site" / "private" / "index.ru.html").as_uri() + f"#{p}"],
-                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120).stdout
-        sections = re.findall(r'<summary[^>]*>([^<]+)</summary>', dom)
-        self.assertIn("Факты", sections)
-        self.assertIn("Гипотезы", sections)
-        self.assertNotIn("Опровергнуто и не найдено", sections)  # по умолчанию скрыто — открывается глазом
-        self.assertIn('id="eyetog"', dom)
+        out = self.case / "site" / "private"
+        c = self.site.layout_probe(out, "pcheck=1")
+        self.assertEqual((c or {}).get("err"), [])
+        dom = self._dom(out, f"ptab=research#{p}")
+        text = htmllib.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style)[^>]*>.*?</\1>", "", dom, flags=re.S)))
         self.assertIn('id="modetog"', dom)
-        self.assertNotIn("Жил в Озерках", re.sub(r"<script.*?</script>", "", dom, flags=re.S))
+        for heading in ("Подтверждённые факты", "Ход поиска", "Отброшенные версии"):
+            self.assertIn(heading, text)
+        self.assertGreater(text.index("Жил в Озерках"), text.index("Отброшенные версии"))
+        self.assertLess(text.index("Родился в Кленовке"), text.index("Ход поиска"))
+
+    def _dom(self, out, query):
+        import subprocess as sp
+        cmd = [self.site.find_chrome(), "--headless=new", "--disable-gpu", "--virtual-time-budget=8000", f"--user-data-dir={self.tmp.name}/chrome",
+               "--allow-file-access-from-files", "--dump-dom", (out / "index.ru.html").as_uri() + "?" + query]
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            cmd.insert(1, "--no-sandbox")
+        return sp.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120, stdin=sp.DEVNULL).stdout
 
     def test_demo_layout(self):
-        import shutil as sh
-        if not sh.which("node"):
-            self.skipTest("нужен node")
         with tempfile.TemporaryDirectory() as tmp:
             case = demo(tmp)
-            res = run("site", "build", case=case)
+            with mock.patch.dict(os.environ, {"KIN_SKIP_LAYOUT_CHECK": "0"}):
+                res = run("site", "build", case=case)
             self.assertNotIn("предупреждение", res.stderr)
             unlock(case)
