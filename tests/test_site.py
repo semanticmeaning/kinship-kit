@@ -401,4 +401,12 @@ console.log(JSON.stringify(viewable([{ a: 'A-1', f: ['p.html.txt'] }, { a: 'A-2'
             with mock.patch.dict(os.environ, {"KIN_SKIP_LAYOUT_CHECK": "0"}):
                 res = run("site", "build", case=case)
             self.assertNotIn("предупреждение", res.stderr)
+            # демо показывает рассказ и портрет — и в публичной версии (решение автора демо, фото с разрешением)
+            run("site", "build", "--profile", "public", case=case)
+            pub = json.loads((case / "site" / "public" / "tree.json").read_text(encoding="utf-8"))
+            p2 = next(p for p in pub["persons"] if p["id"] == "P-0002")
+            self.assertTrue(p2["story"] and p2["photo"]["f"].startswith("photos/"))
+            # фото приходит позже панели, открытой по ссылке: шапка панели всё равно с портретом
+            dom = self._dom(case / "site" / "private", "x=1#P-0002")
+            self.assertRegex(dom, r'class="pava [MFU]? ?photo"')
             unlock(case)

@@ -6,6 +6,7 @@ python3 examples/demo/build_demo_en.py <case-folder>   # the folder must not exi
 Same acceptance scenarios as the Russian demo (build_demo.py): ambiguous identity, conflicting dates, negative search,
 weak hypothesis sent to independent review, living relatives hidden from the public build, state recovery.
 """
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -217,6 +218,29 @@ def main() -> None:
         "where=GAOO f. 15 — Holy Trinity registers", "color=#b5651d")
     kin(case, "case", "line", "add", "somov", "title=Somov", "surname=Somov", "state=awaiting a reply",
         "where=Sosnovka", "color=#2f6b8a")
+    # stories and a portrait — the "Story" block and photo on the site (all fictional; the portrait is a drawing, not a photo)
+    stories = {
+        "P-0001": ["Ivan Kuzmich Vetlugin was born about 1855 in the village of Klenovka. The 1858 revision list gives his age as three.",
+                   "His father is not established yet: the patronymic 'Kuzmich' is the only clue, and it is tested by a separate task."],
+        "P-0002": ["Pyotr Ivanovich was born on 2 March 1885 in Klenovka. In 1910 he married Maria Fyodorovna Somova in the same "
+                   "Trinity church where he had been baptised.",
+                   "In 1941 he was called up. The death notice says he was killed on 18 November 1941; the Book of Memory says he died "
+                   "of wounds in February 1942. No document settles it yet, so both versions are kept."],
+        "P-0004": ["Sergei Petrovich was born on 10 July 1921; his birth is in the civil registry. He hardly remembered his father, "
+                   "who went to the front when Sergei was twenty.",
+                   "This story is fictional: it shows how a family story looks in a case, as the file stories/P-0004.md."],
+    }
+    (case / "stories").mkdir(exist_ok=True)
+    for pid, paras in stories.items():
+        (case / "stories" / f"{pid}.md").write_text(f"---\nperson_id: {pid}\n---\n\n" + "\n\n".join(paras) + "\n", encoding="utf-8")
+    kin(case, "source", "add", str(HERE / "documents" / "portret-risunok.png"), "--scan-publication", "allow",
+        "--title", "Portrait of Pyotr Ivanovich (a drawing for the demo, not a photo)", "--kind", "photo",
+        "--originality", "original", "--group", "portrait", "--provenance", "Drawn for the demo: a fictional person")  # A-0013
+    cfg_path = case / "case.json"
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    cfg.setdefault("site", {})["portraits"] = {"P-0002": {"artifact": "A-0013", "crop": "0.30,0.22,0.70,0.64"}}
+    cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    kin(case, "case", "set", "privacy.public_stories=allow", "--by", "Demo case author")
     print(f"Demo case ready: {case}\nNext: kin --case {case} next")
 
 
